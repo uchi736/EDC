@@ -252,10 +252,11 @@ with st.sidebar:
 # Main content area
 st.subheader("📁 ファイルアップロード")
 
-uploaded_file = st.file_uploader(
-    "テキスト/PDFファイル",
+uploaded_files = st.file_uploader(
+    "テキスト/PDFファイル（複数選択可）",
     type=["txt", "pdf"],
-    help="テキストファイル（1行1テキスト）またはPDFファイル（Azure DIで処理）"
+    accept_multiple_files=True,
+    help="テキストファイル（1行1テキスト）またはPDFファイル（Azure DIで処理）- 複数選択可"
 )
 
 # Schema options
@@ -285,23 +286,41 @@ if st.button("🚀 トリプルを抽出", type="primary", use_container_width=T
             st.stop()
 
     # Validate file upload
-    if uploaded_file is None:
+    if not uploaded_files:
         st.error("ファイルをアップロードしてください")
         st.stop()
 
-    # Prepare input
-    if uploaded_file.name.endswith('.pdf'):
-        # PDF処理（Azure Document Intelligence）
-        with st.spinner("PDFを処理中... Azure Document Intelligence"):
-            try:
-                input_texts = extract_text_from_pdf_azure_di(uploaded_file)
-                st.info(f"📄 {len(input_texts)}ページを抽出しました")
-            except Exception as e:
-                st.error(f"PDF処理エラー: {str(e)}")
-                st.stop()
-    else:
-        # テキストファイル処理
-        input_texts = uploaded_file.read().decode("utf-8").strip().split("\n")
+    # Prepare input from all files
+    input_texts = []
+    file_boundaries = []  # [(start_idx, end_idx, filename), ...]
+
+    with st.spinner("ファイルを処理中..."):
+        for uploaded_file in uploaded_files:
+            start_idx = len(input_texts)
+
+            if uploaded_file.name.endswith('.pdf'):
+                # PDF処理（Azure Document Intelligence）
+                try:
+                    texts = extract_text_from_pdf_azure_di(uploaded_file)
+                    input_texts.extend(texts)
+                    st.info(f"📄 {uploaded_file.name}: {len(texts)}ページを抽出")
+                except Exception as e:
+                    st.error(f"PDF処理エラー ({uploaded_file.name}): {str(e)}")
+                    continue
+            else:
+                # テキストファイル処理
+                texts = uploaded_file.read().decode("utf-8").strip().split("\n")
+                input_texts.extend(texts)
+                st.info(f"📄 {uploaded_file.name}: {len(texts)}行を読み込み")
+
+            end_idx = len(input_texts)
+            file_boundaries.append((start_idx, end_idx, uploaded_file.name))
+
+    if not input_texts:
+        st.error("処理可能なテキストがありません")
+        st.stop()
+
+    st.success(f"合計 {len(input_texts)} テキストを {len(uploaded_files)} ファイルから読み込みました")
 
     # Prepare schema
     schema_dict = {}
@@ -373,28 +392,30 @@ if st.button("🚀 トリプルを抽出", type="primary", use_container_width=T
 
                 st.subheader("📊 抽出結果")
 
-                for idx, (text, triplets) in enumerate(zip(input_texts, results)):
-                    with st.expander(f"テキスト {idx + 1}: {text[:50]}...", expanded=True):
-                        st.markdown(f"**入力:** {text}")
-                        st.markdown("**抽出されたトリプル:**")
+                # Display results grouped by file
+                for start_idx, end_idx, filename in file_boundaries:
+                    with st.expander(f"📄 {filename} ({end_idx - start_idx}テキスト)", expanded=True):
+                        for idx in range(start_idx, end_idx):
+                            text = input_texts[idx]
+                            triplets = results[idx]
+                            st.markdown(f"**テキスト {idx - start_idx + 1}:** {text[:100]}...")
 
-                        if triplets:
-                            # Create table
-                            data = []
-                            for t in triplets:
-                                if t is not None and len(t) == 3:
-                                    data.append({
-                                        "Subject (主語)": t[0],
-                                        "Relation (関係)": t[1],
-                                        "Object (目的語)": t[2]
-                                    })
-
-                            if data:
-                                st.table(data)
+                            if triplets:
+                                data = []
+                                for t in triplets:
+                                    if t is not None and len(t) == 3:
+                                        data.append({
+                                            "Subject": t[0],
+                                            "Relation": t[1],
+                                            "Object": t[2]
+                                        })
+                                if data:
+                                    st.table(data)
+                                else:
+                                    st.caption("正規化されたトリプルなし")
                             else:
-                                st.info("正規化されたトリプルはありません")
-                        else:
-                            st.info("トリプルは抽出されませんでした")
+                                st.caption("トリプルなし")
+                            st.divider()
 
                 # Edge summary (aggregate unique relations)
                 st.subheader("📈 発見されたエッジ（スキーマ候補）")
@@ -434,13 +455,19 @@ if st.button("🚀 トリプルを抽出", type="primary", use_container_width=T
                 # Export section
                 st.subheader("📥 エクスポート")
 
-                # JSON export
+                # JSON export with file grouping
                 export_data = []
-                for idx, (text, triplets) in enumerate(zip(input_texts, results)):
-                    export_data.append({
-                        "input_text": text,
-                        "triplets": [t for t in triplets if t is not None]
-                    })
+                for start_idx, end_idx, filename in file_boundaries:
+                    file_data = {
+                        "file": filename,
+                        "texts": []
+                    }
+                    for idx in range(start_idx, end_idx):
+                        file_data["texts"].append({
+                            "input_text": input_texts[idx],
+                            "triplets": [t for t in results[idx] if t is not None]
+                        })
+                    export_data.append(file_data)
 
                 col1, col2 = st.columns(2)
                 with col1:
