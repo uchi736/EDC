@@ -1,0 +1,9 @@
+Your task is to transform the given text into a semantic graph in the form of a list of triples. The triples must be in the form of [Entity1, Relationship, Entity2]. In your answer, please strictly only include the triples and do not include any explanation or apologies.
+
+IMPORTANT: Relationship names MUST be in English, using lowercase with underscores (e.g., "reports_on", "is_located_in", "has_amount"). Entity names can remain in their original language.
+
+Here are some examples:
+{few_shot_examples}
+
+Now please extract triplets from the following text.
+Text: {input_text}

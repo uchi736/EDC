@@ -1,0 +1,23 @@
+# EDC Requirements (simplified for Azure OpenAI usage)
+
+# Core
+python-dotenv>=1.0.0
+openai>=1.0.0
+sentence-transformers>=2.2.0
+transformers>=4.30.0
+torch>=2.0.0
+
+# UI
+streamlit>=1.28.0
+
+# Utilities
+pandas>=2.0.0
+numpy>=1.24.0
+tqdm>=4.65.0
+pyyaml>=6.0
+
+# PDF Processing (Azure Document Intelligence)
+azure-ai-documentintelligence>=1.0.0
+
+# For lighter embedder models (recommended for quick start)
+# pip install sentence-transformers will install these
