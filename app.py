@@ -250,67 +250,25 @@ with st.sidebar:
         )
 
 # Main content area
-tab1, tab2, tab3 = st.tabs(["📝 テキスト入力", "📁 ファイルアップロード", "📊 スキーマ管理"])
+st.subheader("📁 ファイルアップロード")
 
-with tab1:
-    st.subheader("テキストから知識トリプルを抽出")
+uploaded_file = st.file_uploader(
+    "テキスト/PDFファイル",
+    type=["txt", "pdf"],
+    help="テキストファイル（1行1テキスト）またはPDFファイル（Azure DIで処理）"
+)
 
-    input_text = st.text_area(
-        "入力テキスト",
-        value="John Doe is a student at National University of Singapore.",
-        height=150,
-        help="知識トリプルを抽出したいテキストを入力"
-    )
+# Schema options
+st.subheader("ターゲットスキーマ（オプション）")
+use_schema = st.checkbox("ターゲットスキーマを使用", value=False, help="スキーマなしで実行するとエッジを自動発見します")
 
-    # Schema input
-    st.subheader("ターゲットスキーマ（オプション）")
-    use_schema = st.checkbox("ターゲットスキーマを使用", value=True)
-
-    if use_schema:
-        default_schema = """student,The subject receives education at the institute specified by the object entity.
-country,The subject entity is located in the country specified by the object entity.
-place of birth,The subject entity was born in the location specified by the object entity.
-date of birth,The subject entity was born on the date specified by the object entity.
-occupation,The subject entity has the occupation specified by the object entity."""
-
-        schema_text = st.text_area(
-            "スキーマ定義（CSV形式: relation,definition）",
-            value=default_schema,
-            height=150
-        )
-
-with tab2:
-    st.subheader("ファイルからテキストを読み込み")
-
-    uploaded_file = st.file_uploader(
-        "テキスト/PDFファイル",
-        type=["txt", "pdf"],
-        help="テキストファイル（1行1テキスト）またはPDFファイル（Azure DIで処理）"
-    )
-
+uploaded_schema = None
+if use_schema:
     uploaded_schema = st.file_uploader(
         "スキーマファイル（.csv）",
         type=["csv"],
         help="relation,definition形式のCSVファイル"
     )
-
-with tab3:
-    st.subheader("スキーマ管理")
-
-    # Load existing schemas
-    schema_dir = Path(__file__).parent / "schemas"
-    if schema_dir.exists():
-        schema_files = list(schema_dir.glob("*.csv"))
-        if schema_files:
-            selected_schema = st.selectbox(
-                "既存のスキーマを選択",
-                [f.stem for f in schema_files]
-            )
-
-            if st.button("スキーマを読み込み"):
-                schema_path = schema_dir / f"{selected_schema}.csv"
-                with open(schema_path, "r", encoding="utf-8") as f:
-                    st.code(f.read(), language="csv")
 
 # Run button
 st.divider()
@@ -326,31 +284,29 @@ if st.button("🚀 トリプルを抽出", type="primary", use_container_width=T
             st.error("OpenAI API Keyを設定してください")
             st.stop()
 
+    # Validate file upload
+    if uploaded_file is None:
+        st.error("ファイルをアップロードしてください")
+        st.stop()
+
     # Prepare input
-    if uploaded_file is not None:
-        if uploaded_file.name.endswith('.pdf'):
-            # PDF処理（Azure Document Intelligence）
-            with st.spinner("PDFを処理中... Azure Document Intelligence"):
-                try:
-                    input_texts = extract_text_from_pdf_azure_di(uploaded_file)
-                    st.info(f"📄 {len(input_texts)}ページを抽出しました")
-                except Exception as e:
-                    st.error(f"PDF処理エラー: {str(e)}")
-                    st.stop()
-        else:
-            # テキストファイル処理
-            input_texts = uploaded_file.read().decode("utf-8").strip().split("\n")
+    if uploaded_file.name.endswith('.pdf'):
+        # PDF処理（Azure Document Intelligence）
+        with st.spinner("PDFを処理中... Azure Document Intelligence"):
+            try:
+                input_texts = extract_text_from_pdf_azure_di(uploaded_file)
+                st.info(f"📄 {len(input_texts)}ページを抽出しました")
+            except Exception as e:
+                st.error(f"PDF処理エラー: {str(e)}")
+                st.stop()
     else:
-        input_texts = [input_text.strip()]
+        # テキストファイル処理
+        input_texts = uploaded_file.read().decode("utf-8").strip().split("\n")
 
     # Prepare schema
     schema_dict = {}
-    if use_schema:
-        if uploaded_schema is not None:
-            schema_content = uploaded_schema.read().decode("utf-8")
-        else:
-            schema_content = schema_text
-
+    if use_schema and uploaded_schema is not None:
+        schema_content = uploaded_schema.read().decode("utf-8")
         for line in schema_content.strip().split("\n"):
             if "," in line:
                 parts = line.split(",", 1)
@@ -440,8 +396,45 @@ if st.button("🚀 トリプルを抽出", type="primary", use_container_width=T
                         else:
                             st.info("トリプルは抽出されませんでした")
 
-                # JSON export
+                # Edge summary (aggregate unique relations)
+                st.subheader("📈 発見されたエッジ（スキーマ候補）")
+                edge_summary = {}
+                for triplets in results:
+                    for t in triplets:
+                        if t and len(t) == 3:
+                            rel = t[1]
+                            if rel not in edge_summary:
+                                edge_summary[rel] = {"count": 0, "definition": "", "examples": []}
+                            edge_summary[rel]["count"] += 1
+                            if len(edge_summary[rel]["examples"]) < 3:
+                                edge_summary[rel]["examples"].append((t[0], t[2]))
+
+                # Get definitions from EDC schema
+                for rel in edge_summary:
+                    if rel in edc.schema:
+                        edge_summary[rel]["definition"] = edc.schema[rel]
+
+                if edge_summary:
+                    edge_data = []
+                    for rel, info in sorted(edge_summary.items(), key=lambda x: -x[1]["count"]):
+                        examples_str = ", ".join([f"{s}→{o}" for s, o in info["examples"][:2]])
+                        definition = info["definition"]
+                        if len(definition) > 50:
+                            definition = definition[:50] + "..."
+                        edge_data.append({
+                            "リレーション": rel,
+                            "定義": definition,
+                            "出現回数": info["count"],
+                            "例": examples_str
+                        })
+                    st.table(edge_data)
+                else:
+                    st.info("エッジは抽出されませんでした")
+
+                # Export section
                 st.subheader("📥 エクスポート")
+
+                # JSON export
                 export_data = []
                 for idx, (text, triplets) in enumerate(zip(input_texts, results)):
                     export_data.append({
@@ -449,12 +442,29 @@ if st.button("🚀 トリプルを抽出", type="primary", use_container_width=T
                         "triplets": [t for t in triplets if t is not None]
                     })
 
-                st.download_button(
-                    label="JSONとしてダウンロード",
-                    data=json.dumps(export_data, indent=2, ensure_ascii=False),
-                    file_name="triplets.json",
-                    mime="application/json"
-                )
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.download_button(
+                        label="JSONとしてダウンロード",
+                        data=json.dumps(export_data, indent=2, ensure_ascii=False),
+                        file_name="triplets.json",
+                        mime="application/json"
+                    )
+
+                # Schema CSV export
+                with col2:
+                    csv_lines = ["relation,definition,count"]
+                    for rel, info in sorted(edge_summary.items(), key=lambda x: -x[1]["count"]):
+                        definition = info["definition"].replace('"', '""')
+                        csv_lines.append(f'"{rel}","{definition}",{info["count"]}')
+                    csv_content = "\n".join(csv_lines)
+
+                    st.download_button(
+                        label="スキーマCSVとしてダウンロード",
+                        data=csv_content,
+                        file_name="discovered_schema.csv",
+                        mime="text/csv"
+                    )
 
         except Exception as e:
             st.error(f"エラーが発生しました: {str(e)}")
