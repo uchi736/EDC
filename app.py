@@ -14,10 +14,19 @@ env_path = Path(__file__).parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent))
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-def extract_text_from_pdf_azure_di(uploaded_file) -> list:
+from pdf_processor import extract_text_from_pdf
+
+
+def extract_text_from_pdf_upload(uploaded_file) -> list:
     """
-    Azure Document Intelligence を使用してPDFからテキストをページごとに抽出
+    アップロードされたPDFをページごとのテキストに変換（オンプレ既定）。
+
+    PDF_PROCESSOR / PDF_BACKEND env に従い pdf_processor.extract_text_from_pdf へ委譲。
+    Streamlitのアップロードファイルを一時 .pdf に書き出してパスで処理する。
 
     Args:
         uploaded_file: Streamlitのアップロードファイルオブジェクト
@@ -25,63 +34,13 @@ def extract_text_from_pdf_azure_di(uploaded_file) -> list:
     Returns:
         ページごとのテキストリスト
     """
-    from azure.core.credentials import AzureKeyCredential
-    from azure.ai.documentintelligence import DocumentIntelligenceClient
-    from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
-    import re
-
-    endpoint = os.environ.get("AZURE_DI_ENDPOINT")
-    api_key = os.environ.get("AZURE_DI_API_KEY")
-    model = os.environ.get("AZURE_DI_MODEL", "prebuilt-layout")
-
-    if not endpoint or not api_key:
-        raise ValueError("Azure Document Intelligence の設定が必要です（AZURE_DI_ENDPOINT, AZURE_DI_API_KEY）")
-
-    client = DocumentIntelligenceClient(
-        endpoint=endpoint,
-        credential=AzureKeyCredential(api_key)
-    )
-
-    file_content = uploaded_file.read()
-    poller = client.begin_analyze_document(
-        model,
-        AnalyzeDocumentRequest(bytes_source=file_content),
-    )
-    result = poller.result()
-
-    # ページごとにテキストを抽出
-    texts = []
-    if result.pages:
-        for page in result.pages:
-            page_num = page.page_number
-            # ページ範囲内のコンテンツを抽出
-            page_content = []
-            if result.paragraphs:
-                for para in result.paragraphs:
-                    if hasattr(para, 'bounding_regions') and para.bounding_regions:
-                        for region in para.bounding_regions:
-                            if region.page_number == page_num:
-                                page_content.append(para.content)
-                                break
-
-            if page_content:
-                # テキストをクリーンアップ
-                text = "\n".join(page_content)
-                # 日本語の不要なスペースを削除
-                text = re.sub(r'[ ]+([ぁ-んァ-ヴー一-龠々〆〤])', r'\1', text)
-                text = re.sub(r'([ぁ-んァ-ヴー一-龠々〆〤])[ ]+', r'\1', text)
-                texts.append(text.strip())
-
-    # ページごとの抽出が空の場合、全体コンテンツを使用
-    if not texts and result.content:
-        texts = [result.content]
-
-    return texts
-
-
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent))
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(uploaded_file.read())
+        tmp_path = tmp.name
+    try:
+        return extract_text_from_pdf(tmp_path)
+    finally:
+        os.unlink(tmp_path)
 
 st.set_page_config(
     page_title="EDC - 知識トリプル抽出",
@@ -102,15 +61,24 @@ with st.sidebar:
         os.environ.get("AZURE_OPENAI_API_KEY")
     )
 
-    # API Provider selection
+    # API Provider selection（完全ローカル運用では vLLM が既定）
     api_provider = st.selectbox(
         "API Provider",
-        ["Azure OpenAI", "OpenAI"],
-        index=0 if azure_configured else 1,
-        help="使用するLLM APIを選択"
+        ["vLLM (ローカル)", "Azure OpenAI", "OpenAI"],
+        index=0,
+        help="使用するLLM APIを選択（既定: ローカルvLLM）"
     )
 
-    if api_provider == "Azure OpenAI":
+    if api_provider == "vLLM (ローカル)":
+        st.subheader("vLLM 設定")
+        st.success("✅ .env の VLLM_* 設定を使用（完全ローカル）")
+        st.caption(f"LLM: {os.environ.get('VLLM_ENDPOINT', '(未設定)')} / {os.environ.get('VLLM_MODEL', '(未設定)')}")
+        st.caption(f"Embedding: {os.environ.get('VLLM_EMBEDDING_ENDPOINT', '(未設定)')} / {os.environ.get('VLLM_EMBEDDING_MODEL', '(未設定)')}")
+        # "vllm" を使うと llm_utils が .env の VLLM_* 設定を参照
+        llm_model = "vllm"
+        embedder_model = "vllm"
+
+    elif api_provider == "Azure OpenAI":
         st.subheader("Azure OpenAI 設定")
 
         # Show status from .env
@@ -195,19 +163,17 @@ with st.sidebar:
 
     st.divider()
 
-    # Azure Document Intelligence settings
+    # PDF処理設定（完全ローカル: オンプレ PaddleX が既定）
     st.subheader("📄 PDF処理設定")
-    azure_di_configured = bool(
-        os.environ.get("AZURE_DI_ENDPOINT") and
-        os.environ.get("AZURE_DI_API_KEY")
-    )
+    pdf_processor = os.environ.get("PDF_PROCESSOR", "onprem")
 
-    if azure_di_configured:
-        st.success("✅ Azure DI設定済み")
+    if pdf_processor == "onprem":
+        st.success(f"✅ オンプレ処理: {os.environ.get('PDF_BACKEND', 'paddleocr_remote')}")
+        st.caption(f"PaddleX: {os.environ.get('PADDLEX_ENDPOINT', '(未設定)')}")
     else:
-        st.warning("⚠️ Azure DI未設定（PDFアップロード不可）")
+        st.info(f"PDF_PROCESSOR={pdf_processor}")
 
-    with st.expander("Azure Document Intelligence"):
+    with st.expander("Azure Document Intelligence（ロールバック用）"):
         di_endpoint = st.text_input(
             "DI Endpoint",
             value=os.environ.get("AZURE_DI_ENDPOINT", ""),
@@ -256,7 +222,7 @@ uploaded_files = st.file_uploader(
     "テキスト/PDFファイル（複数選択可）",
     type=["txt", "pdf"],
     accept_multiple_files=True,
-    help="テキストファイル（1行1テキスト）またはPDFファイル（Azure DIで処理）- 複数選択可"
+    help="テキストファイル（1行1テキスト）またはPDFファイル（オンプレ PaddleX で処理）- 複数選択可"
 )
 
 # Schema options
@@ -276,7 +242,11 @@ st.divider()
 
 if st.button("🚀 トリプルを抽出", type="primary", use_container_width=True):
     # Validate configuration
-    if api_provider == "Azure OpenAI":
+    if api_provider == "vLLM (ローカル)":
+        if not os.environ.get("VLLM_ENDPOINT"):
+            st.error("VLLM_ENDPOINT を .env に設定してください")
+            st.stop()
+    elif api_provider == "Azure OpenAI":
         if not os.environ.get("AZURE_OPENAI_ENDPOINT") or not os.environ.get("AZURE_OPENAI_API_KEY"):
             st.error("Azure OpenAIのEndpointとAPI Keyを設定してください")
             st.stop()
@@ -299,9 +269,9 @@ if st.button("🚀 トリプルを抽出", type="primary", use_container_width=T
             start_idx = len(input_texts)
 
             if uploaded_file.name.endswith('.pdf'):
-                # PDF処理（Azure Document Intelligence）
+                # PDF処理（オンプレ既定: PaddleX。PDF_PROCESSOR/PDF_BACKEND で切替）
                 try:
-                    texts = extract_text_from_pdf_azure_di(uploaded_file)
+                    texts = extract_text_from_pdf_upload(uploaded_file)
                     input_texts.extend(texts)
                     st.info(f"📄 {uploaded_file.name}: {len(texts)}ページを抽出")
                 except Exception as e:

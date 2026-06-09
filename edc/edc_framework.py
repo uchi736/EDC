@@ -1,6 +1,7 @@
 from edc.extract import Extractor
 from edc.schema_definition import SchemaDefiner
 from edc.schema_canonicalization import SchemaCanonicalizer
+from edc.type_canonicalization import TypeCanonicalizer
 from edc.entity_extraction import EntityExtractor
 import edc.utils.llm_utils as llm_utils
 from typing import List
@@ -57,6 +58,21 @@ class EDC:
         self.initial_schema_path = edc_configuration["target_schema_path"]
         self.enrich_schema = edc_configuration["enrich_schema"]
 
+        # Type Canonicalization module settings (symmetric to Schema Canonicalization)
+        self.tc_template_file_path = edc_configuration.get(
+            "tc_prompt_template_file_path", "./prompt_templates/tc_template.txt"
+        )
+        self.initial_types_path = edc_configuration.get("target_types_path", None)
+        self.enrich_types = edc_configuration.get("enrich_types", False)
+        self.oie_typed_template_file_path = edc_configuration.get(
+            "oie_typed_prompt_template_file_path",
+            "./prompt_templates/oie_typed_template.txt",
+        )
+        self.oie_typed_few_shot_example_file_path = edc_configuration.get(
+            "oie_typed_few_shot_example_file_path",
+            "./few_shot_examples/example/oie_typed_few_shot_examples.txt",
+        )
+
         if self.initial_schema_path is not None:
             reader = csv.reader(open(self.initial_schema_path, "r", encoding="utf-8"))
             self.schema = {}
@@ -65,6 +81,15 @@ class EDC:
                 self.schema[relation] = relation_definition
         else:
             self.schema = {}
+
+        if self.initial_types_path is not None:
+            reader = csv.reader(open(self.initial_types_path, "r", encoding="utf-8"))
+            self.types = {}
+            for row in reader:
+                type_name, type_definition = row
+                self.types[type_name] = type_definition
+        else:
+            self.types = {}
 
         # Load the needed models and tokenizers
         self.needed_model_set = set(
@@ -130,11 +155,32 @@ class EDC:
             entity_hint_list = ["" for _ in input_text_list]
             relation_hint_list = ["" for _ in input_text_list]
             logger.info("Running OIE...")
-            oie_few_shot_examples_str = open(self.oie_few_shot_example_file_path, encoding="utf-8").read()
-            oie_few_shot_prompt_template_str = open(self.oie_prompt_template_file_path, encoding="utf-8").read()
+
+            # Typed mode: enabled when a target types schema is provided OR enrich_types is set
+            # (mirrors how SC uses target_schema_path + enrich_schema)
+            typed_mode = (self.initial_types_path is not None) or self.enrich_types
+            entity_types_str = None
+            if typed_mode:
+                oie_few_shot_examples_str = open(
+                    self.oie_typed_few_shot_example_file_path, encoding="utf-8"
+                ).read()
+                oie_few_shot_prompt_template_str = open(
+                    self.oie_typed_template_file_path, encoding="utf-8"
+                ).read()
+                type_lines = [f"- {t}: {desc}" for t, desc in self.types.items()]
+                entity_types_str = "\n".join(type_lines) if type_lines else "(no predefined types; propose type names freely)"
+                logger.info(f"Typed OIE enabled with {len(type_lines)} predefined entity types")
+            else:
+                oie_few_shot_examples_str = open(self.oie_few_shot_example_file_path, encoding="utf-8").read()
+                oie_few_shot_prompt_template_str = open(self.oie_prompt_template_file_path, encoding="utf-8").read()
 
             for input_text in tqdm(input_text_list):
-                oie_triples = extractor.extract(input_text, oie_few_shot_examples_str, oie_few_shot_prompt_template_str)
+                oie_triples = extractor.extract(
+                    input_text,
+                    oie_few_shot_examples_str,
+                    oie_few_shot_prompt_template_str,
+                    entity_types_str=entity_types_str,
+                )
                 oie_triples_list.append(oie_triples)
                 logger.debug(f"{input_text}\n -> {oie_triples}\n")
 
@@ -271,7 +317,7 @@ class EDC:
             canon_candidate_dict_per_entry_list.append(canon_candidate_dict_list)
 
             logger.debug(f"{input_text}\n, {oie_triplets} ->\n {canonicalized_triplets}")
-            logger.debug(f"Retrieved candidate relations {canon_candidate_dict}")
+            logger.debug(f"Retrieved candidate relations {canon_candidate_dict_list}")
         logger.info("Schema Canonicalization finished.")
 
         if free_model:
@@ -281,6 +327,87 @@ class EDC:
             del self.loaded_model_dict[self.sc_llm_name]
 
         return canonicalized_triplets_list, canon_candidate_dict_per_entry_list
+
+    def type_canonicalization(
+        self,
+        input_text_list: List[str],
+        canonicalized_triplets_list: List[List[List[str]]],
+        free_model=False,
+    ):
+        """Normalize entity types in 5-tuple triplets against self.types.
+
+        Mirror of schema_canonicalization(): takes canonicalized triplets and
+        routes each (entity, raw_type) pair through a TypeCanonicalizer.
+        3-tuple triplets (no types) are passed through unchanged.
+        """
+        logger.info("Running Type Canonicalization...")
+
+        tc_verify_prompt_template_str = open(self.tc_template_file_path, encoding="utf-8").read()
+
+        tc_embedder = self.load_model(self.sc_embedder_name, "sts")
+
+        if not llm_utils.is_model_openai(self.sc_llm_name):
+            tc_verify_model, tc_verify_tokenizer = self.load_model(self.sc_llm_name, "sts")
+            type_canonicalizer = TypeCanonicalizer(self.types, tc_embedder, tc_verify_model, tc_verify_tokenizer)
+        else:
+            type_canonicalizer = TypeCanonicalizer(self.types, tc_embedder, verify_openai_model=self.sc_llm_name)
+
+        typed_triplets_list = []
+        type_candidate_dict_per_entry_list = []
+
+        # Cache (entity, raw_type) → canonical type to avoid redundant LLM calls
+        type_cache: dict = {}
+
+        for idx, input_text in enumerate(tqdm(canonicalized_triplets_list)):
+            chunk = canonicalized_triplets_list[idx]
+            typed_chunk = []
+            type_candidates_chunk = []
+            for triplet in chunk:
+                if triplet is None or len(triplet) != 5:
+                    typed_chunk.append(triplet)
+                    type_candidates_chunk.append({})
+                    continue
+                subj, subj_type_raw, rel, obj, obj_type_raw = triplet
+
+                subj_key = (subj, subj_type_raw)
+                if subj_key in type_cache:
+                    subj_type = type_cache[subj_key]
+                    subj_candidates = {}
+                else:
+                    subj_type, subj_candidates = type_canonicalizer.canonicalize(
+                        input_text_list[idx], subj, subj_type_raw,
+                        tc_verify_prompt_template_str, self.enrich_types,
+                    )
+                    if subj_type is None:
+                        subj_type = "Other"
+                    type_cache[subj_key] = subj_type
+
+                obj_key = (obj, obj_type_raw)
+                if obj_key in type_cache:
+                    obj_type = type_cache[obj_key]
+                    obj_candidates = {}
+                else:
+                    obj_type, obj_candidates = type_canonicalizer.canonicalize(
+                        input_text_list[idx], obj, obj_type_raw,
+                        tc_verify_prompt_template_str, self.enrich_types,
+                    )
+                    if obj_type is None:
+                        obj_type = "Other"
+                    type_cache[obj_key] = obj_type
+
+                typed_chunk.append([subj, subj_type, rel, obj, obj_type])
+                type_candidates_chunk.append({"subject": subj_candidates, "object": obj_candidates})
+
+            typed_triplets_list.append(typed_chunk)
+            type_candidate_dict_per_entry_list.append(type_candidates_chunk)
+
+        logger.info("Type Canonicalization finished.")
+
+        if free_model:
+            logger.info(f"Freeing TC models")
+            llm_utils.free_model(tc_embedder)
+
+        return typed_triplets_list, type_candidate_dict_per_entry_list
 
     def construct_refinement_hint(
         self,
@@ -425,8 +552,9 @@ class EDC:
     def extract_kg(self, input_text_list: List[str], output_dir: str = None, refinement_iterations=0):
         if output_dir is not None:
             if os.path.exists(output_dir):
-                logger.error(f"Output directory {output_dir} already exists! Quitting.")
-                exit()
+                import shutil
+                logger.warning(f"Output directory {output_dir} already exists. Overwriting.")
+                shutil.rmtree(output_dir)
             for iteration in range(refinement_iterations + 1):
                 pathlib.Path(f"{output_dir}/iter{iteration}").mkdir(parents=True, exist_ok=True)
 
@@ -459,6 +587,20 @@ class EDC:
                 previous_extracted_triplets_list=triplets_from_last_iteration,
             )
 
+            # Typed mode: strip 5-tuples to 3-tuples before SD/SC (which assume 3-tuples).
+            # Keep the original 5-tuples in a sidecar so types can be re-attached after SC.
+            typed_mode = (self.initial_types_path is not None) or self.enrich_types
+            typed_oie_list = None
+            if typed_mode:
+                typed_oie_list = oie_triplets_list
+                oie_triplets_list = [
+                    [
+                        [t[0], t[2], t[3]] if len(t) == 5 else list(t)
+                        for t in chunk
+                    ]
+                    for chunk in typed_oie_list
+                ]
+
             del required_model_dict_current_iteration["sd"]
             sd_dict_list = self.schema_definition(
                 input_text_list,
@@ -476,6 +618,30 @@ class EDC:
                 free_model=self.sc_llm_name not in required_model_dict_current_iteration.values()
                 and iteration == refinement_iterations,
             )
+
+            # Typed mode: re-attach types (positional align with pre-SC triplets),
+            # then run Type Canonicalization (symmetric to Schema Canonicalization).
+            if typed_mode:
+                restored_canon = []
+                for chunk_idx, canon_chunk in enumerate(canon_triplets_list):
+                    src_chunk = typed_oie_list[chunk_idx]
+                    restored = []
+                    for i, canon_t in enumerate(canon_chunk):
+                        if canon_t is None:
+                            restored.append(None)
+                            continue
+                        if i < len(src_chunk) and len(src_chunk[i]) == 5:
+                            subj_type = src_chunk[i][1]
+                            obj_type = src_chunk[i][4]
+                            restored.append([canon_t[0], subj_type, canon_t[1], canon_t[2], obj_type])
+                        else:
+                            restored.append(canon_t)
+                    restored_canon.append(restored)
+
+                canon_triplets_list, type_candidate_dict_list = self.type_canonicalization(
+                    input_text_list,
+                    restored_canon,
+                )
 
             non_null_triplets_list = [
                 [triple for triple in triplets if triple is not None] for triplets in canon_triplets_list

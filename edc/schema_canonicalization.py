@@ -98,10 +98,10 @@ class SchemaCanonicalizer:
             )
         else:
             verification_result = llm_utils.openai_chat_completion(
-                self.verifier_openai_model, None, messages, max_tokens=1
+                self.verifier_openai_model, None, messages, max_tokens=512
             )
 
-        if verification_result[0] in choice_letters_list:
+        if verification_result and verification_result[0] in choice_letters_list:
             canonicalized_triplet[1] = candidate_relations[choice_letters_list.index(verification_result[0])]
         else:
             return None
@@ -150,13 +150,14 @@ class SchemaCanonicalizer:
         if canonicalized_triplet is None:
             # Cannot be canonicalized
             if enrich:
-                self.schema_dict[open_relation] = open_relation_definition_dict[open_relation]
+                definition = open_relation_definition_dict.get(open_relation, open_relation)
+                self.schema_dict[open_relation] = definition
                 if "sts_query" in self.embedder.prompts:
                     embedding = self.embedder.encode(
-                        open_relation_definition_dict[open_relation], prompt_name="sts_query"
+                        definition, prompt_name="sts_query"
                     )
                 else:
-                    embedding = self.embedder.encode(open_relation_definition_dict[open_relation])
+                    embedding = self.embedder.encode(definition)
                 self.schema_embedding_dict[open_relation] = embedding
                 canonicalized_triplet = open_triplet
         return canonicalized_triplet, dict(zip(candidate_relations, candidate_scores))

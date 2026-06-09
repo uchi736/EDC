@@ -30,9 +30,10 @@ load_env()
 
 logger = logging.getLogger(__name__)
 
-# Azure OpenAI client cache
+# Client cache
 _azure_client = None
 _openai_client = None
+_vllm_client = None
 
 
 def get_azure_client():
@@ -53,6 +54,17 @@ def get_openai_client():
     if _openai_client is None:
         _openai_client = OpenAI(api_key=os.environ.get("OPENAI_KEY"))
     return _openai_client
+
+
+def get_vllm_client():
+    """Get or create OpenAI-compatible vLLM client"""
+    global _vllm_client
+    if _vllm_client is None:
+        _vllm_client = OpenAI(
+            api_key=os.environ.get("VLLM_API_KEY", "dummy"),
+            base_url=os.environ.get("VLLM_ENDPOINT", "http://localhost:8000/v1"),
+        )
+    return _vllm_client
 
 
 def free_model(model=None, tokenizer=None):
@@ -141,7 +153,7 @@ def parse_raw_triplets(raw_triplets: str):
         bracketed_str = raw_triplets[l : r + 1]
         try:
             parsed_triple = ast.literal_eval(bracketed_str)
-            if len(parsed_triple) == 3 and all([isinstance(t, str) for t in parsed_triple]):
+            if len(parsed_triple) in (3, 5) and all([isinstance(t, str) for t in parsed_triple]):
                 if all([e != "" and e != "_" for e in parsed_triple]):
                     collected_triples.append(parsed_triple)
             elif not all([type(x) == type(parsed_triple[0]) for x in parsed_triple]):
@@ -176,13 +188,27 @@ def parse_relation_definition(raw_definitions: str):
 
 
 def is_model_openai(model_name):
-    """Check if model is OpenAI or Azure OpenAI"""
-    return "gpt" in model_name or is_model_azure(model_name)
+    """Check if model is OpenAI, Azure OpenAI, or vLLM (OpenAI-compatible API)"""
+    return "gpt" in model_name or is_model_azure(model_name) or is_model_vllm(model_name)
 
 
 def is_model_azure(model_name):
     """Check if model should use Azure OpenAI"""
     return model_name.startswith("azure/") or model_name == "azure"
+
+
+def is_model_vllm(model_name):
+    """Check if model should use vLLM (OpenAI-compatible API)"""
+    return model_name.startswith("vllm/") or model_name == "vllm"
+
+
+def get_vllm_model_name(model_name):
+    """Extract model name for vLLM from model_name format"""
+    if model_name == "vllm":
+        return os.environ.get("VLLM_MODEL", "default")
+    if model_name.startswith("vllm/"):
+        return model_name[len("vllm/"):]
+    return model_name
 
 
 def get_azure_chat_deployment_name():
@@ -244,14 +270,38 @@ def is_embedder_azure(embedder_name: str) -> bool:
     return embedder_name == "azure" or embedder_name.startswith("azure/")
 
 
+class VllmEmbedder:
+    """
+    vLLM Embedding wrapper (OpenAI-compatible /v1/embeddings).
+    Drop-in replacement for SentenceTransformer.
+    """
+
+    def __init__(self):
+        self.client = OpenAI(
+            api_key=os.environ.get("VLLM_API_KEY", "dummy"),
+            base_url=os.environ.get("VLLM_EMBEDDING_ENDPOINT",
+                     os.environ.get("VLLM_ENDPOINT", "http://localhost:8000/v1")),
+        )
+        self.model = os.environ.get("VLLM_EMBEDDING_MODEL", "default")
+        self.prompts = {}  # SentenceTransformer compatibility
+
+    def encode(self, text: str, prompt_name: str = None, prompt: str = None) -> List[float]:
+        response = self.client.embeddings.create(model=self.model, input=text)
+        return response.data[0].embedding if isinstance(text, str) else [item.embedding for item in response.data]
+
+
 def get_embedder(embedder_name: str):
     """
     Get embedder instance based on name.
-    Returns AzureEmbedder for "azure" or SentenceTransformer for others.
+    Returns AzureEmbedder for "azure", VllmEmbedder for "vllm",
+    or SentenceTransformer for others.
     """
     if is_embedder_azure(embedder_name):
         logger.info("Using Azure OpenAI Embedder")
         return AzureEmbedder()
+    elif is_model_vllm(embedder_name):
+        logger.info("Using vLLM Embedder")
+        return VllmEmbedder()
     else:
         # Lazy import SentenceTransformer only when needed
         from sentence_transformers import SentenceTransformer
@@ -317,6 +367,16 @@ def openai_chat_completion(model, system_prompt, history, temperature=0, max_tok
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
+            elif is_model_vllm(model):
+                # vLLM (OpenAI-compatible API)
+                client = get_vllm_client()
+                model_name = get_vllm_model_name(model)
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
             else:
                 # Standard OpenAI
                 client = get_openai_client()
@@ -330,5 +390,8 @@ def openai_chat_completion(model, system_prompt, history, temperature=0, max_tok
             logger.warning(f"API call failed: {e}, retrying in 5 seconds...")
             time.sleep(5)
 
-    logging.debug(f"Model: {model}\nPrompt:\n {messages}\n Result: {response.choices[0].message.content}")
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    if content is None:
+        content = ""
+    logging.debug(f"Model: {model}\nPrompt:\n {messages}\n Result: {content}")
+    return content

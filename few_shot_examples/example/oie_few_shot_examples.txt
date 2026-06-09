@@ -21,3 +21,11 @@ Triplets: [['Liselotte_Grschebina', 'bornIn', 'Karlsruhe'], ['Liselotte_Grschebi
 Example 6:
 Text: Agremiação Sportiva Arapiraquense managed by Vica has 17000 members and play in the Campeonato Brasileiro Série C league which is from Brazil.
 Triplets: [['Agremiação_Sportiva_Arapiraquense', 'league', 'Campeonato_Brasileiro_Série_C'], ['Campeonato_Brasileiro_Série_C', 'country', 'Brazil'], ['Agremiação_Sportiva_Arapiraquense', 'numberOfMembers', '17000'], ['Agremiação_Sportiva_Arapiraquense', 'manager', 'Vica']]
+
+Example 7:
+Text: 東京スカイツリーは墨田区に位置し、高さ634メートルで2012年に開業した。設計は日建設計が担当した。
+Triplets: [['東京スカイツリー', 'located_in', '墨田区'], ['東京スカイツリー', 'has_height', '634メートル'], ['東京スカイツリー', 'opened_in', '2012'], ['東京スカイツリー', 'designed_by', '日建設計']]
+
+Example 8:
+Text: 京都大学の山中伸弥教授は2012年にノーベル生理学・医学賞を受賞した。iPS細胞の発見が評価された。
+Triplets: [['山中伸弥', 'affiliated_with', '京都大学'], ['山中伸弥', 'received', 'ノーベル生理学・医学賞'], ['山中伸弥', 'award_year', '2012'], ['山中伸弥', 'recognized_for', 'iPS細胞の発見']]

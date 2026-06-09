@@ -3,6 +3,7 @@
 # Core
 python-dotenv>=1.0.0
 openai>=1.0.0
+requests>=2.31.0
 sentence-transformers>=2.2.0
 transformers>=4.30.0
 torch>=2.0.0
@@ -16,8 +17,10 @@ numpy>=1.24.0
 tqdm>=4.65.0
 pyyaml>=6.0
 
-# PDF Processing (Azure Document Intelligence)
-azure-ai-documentintelligence>=1.0.0
+# PDF Processing
+# 既定はオンプレ PaddleX (PDF_PROCESSOR=onprem) -> requests のみで動作。
+# 以下は Azure DI ロールバック用（PDF_PROCESSOR=azure_di のときだけ必要）。
+# azure-ai-documentintelligence>=1.0.0
 
 # For lighter embedder models (recommended for quick start)
 # pip install sentence-transformers will install these

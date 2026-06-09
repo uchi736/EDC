@@ -20,6 +20,7 @@ class Extractor:
         prompt_template_str: str,
         entities_hint: str = None,
         relations_hint: str = None,
+        entity_types_str: str = None,
     ) -> List[List[str]]:
         assert (entities_hint is None and relations_hint is None) or (
             relations_hint is not None and relations_hint is not None
@@ -31,6 +32,7 @@ class Extractor:
                 "input_text": input_text_str,
                 "entities_hint": entities_hint,
                 "relations_hint": relations_hint,
+                "entity_types": entity_types_str or "",
             }
         )
 
