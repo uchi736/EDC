@@ -680,3 +680,147 @@ class EDC:
                 final_result_file.flush()
 
         return canon_triplets_list
+
+    # ------------------------------------------------------------------
+    # HITL (Human-in-the-loop) 用の2段階API。
+    # extract_kg() を Phase A / Phase B に分割し、間に人手のスキーマ・
+    # キュレーションを挟めるようにする。各ステージ実装(oie/schema_definition/
+    # schema_canonicalization/type_canonicalization)は extract_kg と共用。
+    # ------------------------------------------------------------------
+    def extract_and_define(self, input_text_list: List[str]):
+        """Phase A: OIE + Schema Definition のみ実行し、発見スキーマを返す。
+
+        Returns:
+            dict: {
+              "input_text_list", "oie_triplets_list", "sd_dict_list",
+              "typed_oie_list" (typed時の5タプル, それ以外None), "typed_mode",
+              "discovered_schema": [{"relation","definition","count"}, ...] (count降順),
+              "discovered_types": [{"type","definition","count"}, ...] (typed時のみ。それ以外None)
+            }
+        """
+        oie_triplets_list, _entity_hint_list, _relation_hint_list = self.oie(
+            input_text_list, previous_extracted_triplets_list=None, free_model=False
+        )
+
+        # Typed mode: 5タプルを3タプルへ縮約し、元の5タプルをサイドカー保持
+        # (extract_kg と同一ロジック)
+        typed_mode = (self.initial_types_path is not None) or self.enrich_types
+        typed_oie_list = None
+        if typed_mode:
+            typed_oie_list = oie_triplets_list
+            oie_triplets_list = [
+                [[t[0], t[2], t[3]] if len(t) == 5 else list(t) for t in chunk]
+                for chunk in typed_oie_list
+            ]
+
+        sd_dict_list = self.schema_definition(input_text_list, oie_triplets_list, free_model=False)
+
+        # 発見スキーマを構築: 定義は最長のものを採用、count は OIE 出現回数
+        relation_def = {}
+        for sd_dict in sd_dict_list:
+            for rel, definition in sd_dict.items():
+                definition = definition or ""
+                if rel not in relation_def or len(definition) > len(relation_def[rel]):
+                    relation_def[rel] = definition
+        relation_count = {}
+        for chunk in oie_triplets_list:
+            for t in chunk:
+                if len(t) >= 2:
+                    rel = t[1]
+                    relation_count[rel] = relation_count.get(rel, 0) + 1
+        all_relations = set(relation_def) | set(relation_count)
+        discovered_schema = [
+            {
+                "relation": rel,
+                "definition": relation_def.get(rel, ""),
+                "count": relation_count.get(rel, 0),
+            }
+            for rel in all_relations
+        ]
+        discovered_schema.sort(key=lambda x: -x["count"])
+
+        # 発見された型を構築 (typed時のみ。relation スキーマと対称)。
+        # 初期型スキーマ self.types の定義をシードに、typed OIE が出した raw 型を
+        # 追加し、出現回数を集計する。OIE は型に定義を付けないので未シード型の
+        # definition は空（人手キュレーションで補える）。
+        discovered_types = None
+        if typed_mode and typed_oie_list is not None:
+            type_def = dict(self.types)  # 初期型スキーマの定義をシード
+            type_count = {}
+            for chunk in typed_oie_list:
+                for t in chunk:
+                    if len(t) == 5:
+                        for tp in (t[1], t[4]):
+                            type_count[tp] = type_count.get(tp, 0) + 1
+                            type_def.setdefault(tp, "")
+            all_types = set(type_def) | set(type_count)
+            discovered_types = [
+                {"type": tp, "definition": type_def.get(tp, ""), "count": type_count.get(tp, 0)}
+                for tp in all_types
+            ]
+            discovered_types.sort(key=lambda x: -x["count"])
+
+        return {
+            "input_text_list": input_text_list,
+            "oie_triplets_list": oie_triplets_list,
+            "sd_dict_list": sd_dict_list,
+            "typed_oie_list": typed_oie_list,
+            "typed_mode": typed_mode,
+            "discovered_schema": discovered_schema,
+            "discovered_types": discovered_types,
+        }
+
+    def canonicalize_with_schema(
+        self,
+        input_text_list: List[str],
+        oie_triplets_list,
+        sd_dict_list,
+        curated_schema: dict,
+        typed_oie_list=None,
+        enrich: bool = False,
+        curated_types: dict = None,
+        enrich_types: bool = False,
+    ):
+        """Phase B: 人手で確定したスキーマで Schema (+ Type) Canonicalization を実行。
+
+        curated_schema (relation->definition) を self.schema に設定して再正規化する。
+        SchemaCanonicalizer は呼び出し毎に self.schema を再embeddingするため、
+        確定スキーマに対してマッピングされる。
+        typed時 (typed_oie_list が渡された場合) は型の再付与 + Type Canonicalization も行う。
+        curated_types を渡すと self.types に設定し、enrich_types=True なら確定型スキーマに
+        無い型は新規追加（「初期を与えて漏れは追加」）。
+        """
+        self.schema = dict(curated_schema)
+        self.enrich_schema = enrich
+
+        canon_triplets_list, _canon_candidate_dict_list = self.schema_canonicalization(
+            input_text_list, oie_triplets_list, sd_dict_list, free_model=False
+        )
+
+        # Typed mode: 型を再付与して Type Canonicalization (extract_kg と同一ロジック)。
+        # typed_oie_list の有無で typed か判定（最も確実なシグナル）。
+        if typed_oie_list is not None:
+            if curated_types is not None:
+                self.types = dict(curated_types)
+            self.enrich_types = enrich_types
+            restored_canon = []
+            for chunk_idx, canon_chunk in enumerate(canon_triplets_list):
+                src_chunk = typed_oie_list[chunk_idx]
+                restored = []
+                for i, canon_t in enumerate(canon_chunk):
+                    if canon_t is None:
+                        restored.append(None)
+                        continue
+                    if i < len(src_chunk) and len(src_chunk[i]) == 5:
+                        subj_type = src_chunk[i][1]
+                        obj_type = src_chunk[i][4]
+                        restored.append([canon_t[0], subj_type, canon_t[1], canon_t[2], obj_type])
+                    else:
+                        restored.append(canon_t)
+                restored_canon.append(restored)
+
+            canon_triplets_list, _type_candidate_dict_list = self.type_canonicalization(
+                input_text_list, restored_canon
+            )
+
+        return canon_triplets_list

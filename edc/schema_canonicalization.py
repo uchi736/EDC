@@ -48,15 +48,19 @@ class SchemaCanonicalizer:
         else:
             query_embedding = self.embedder.encode(query_relation_definition)
 
-        scores = np.array([query_embedding]) @ np.array(target_relation_embedding_list).T
+        # コサイン類似度（埋め込みを正規化）。生のドット積だと閾値が意味を持たないため。
+        q = np.asarray(query_embedding, dtype=float)
+        M = np.asarray(target_relation_embedding_list, dtype=float)
+        q = q / (np.linalg.norm(q) + 1e-12)
+        M = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-12)
+        scores = M @ q
 
-        scores = scores[0]
         highest_score_indices = np.argsort(-scores)
 
         return {
             target_relation_list[idx]: self.schema_dict[target_relation_list[idx]]
             for idx in highest_score_indices[:top_k]
-        }, [scores[idx] for idx in highest_score_indices[:top_k]]
+        }, [float(scores[idx]) for idx in highest_score_indices[:top_k]]
 
     def llm_verify(
         self,
@@ -148,8 +152,15 @@ class SchemaCanonicalizer:
             canonicalized_triplet = None
 
         if canonicalized_triplet is None:
-            # Cannot be canonicalized
-            if enrich:
+            # 類似度マージゲート: LLMが「該当なし」でも、最近傍の既存関係とのコサイン類似度が
+            # 閾値τ(CANON_MERGE_THRESHOLD)以上なら、新規追加せず最近傍へ統合する。
+            # これにより enrich によるスキーマの際限ない増殖を防ぎ、本当に新しい関係だけ追加される。
+            merge_threshold = float(os.environ.get("CANON_MERGE_THRESHOLD", "0.9"))
+            if candidate_relations and candidate_scores and candidate_scores[0] >= merge_threshold:
+                nearest_relation = next(iter(candidate_relations))
+                canonicalized_triplet = copy.deepcopy(open_triplet)
+                canonicalized_triplet[1] = nearest_relation
+            elif enrich:
                 definition = open_relation_definition_dict.get(open_relation, open_relation)
                 self.schema_dict[open_relation] = definition
                 if "sts_query" in self.embedder.prompts:

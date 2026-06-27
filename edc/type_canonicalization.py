@@ -1,4 +1,5 @@
 from typing import List
+import os
 import edc.utils.llm_utils as llm_utils
 import numpy as np
 import copy
@@ -44,14 +45,19 @@ class TypeCanonicalizer:
         else:
             query_embedding = self.embedder.encode(query_type_or_description)
 
-        scores = np.array([query_embedding]) @ np.array(target_type_embedding_list).T
-        scores = scores[0]
+        # コサイン類似度（埋め込みを正規化）。閾値ゲートで使うため。
+        q = np.asarray(query_embedding, dtype=float)
+        M = np.asarray(target_type_embedding_list, dtype=float)
+        q = q / (np.linalg.norm(q) + 1e-12)
+        M = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-12)
+        scores = M @ q
+
         highest_score_indices = np.argsort(-scores)
 
         return {
             target_type_list[idx]: self.type_dict[target_type_list[idx]]
             for idx in highest_score_indices[:top_k]
-        }, [scores[idx] for idx in highest_score_indices[:top_k]]
+        }, [float(scores[idx]) for idx in highest_score_indices[:top_k]]
 
     def llm_verify(
         self,
@@ -121,7 +127,12 @@ class TypeCanonicalizer:
             )
 
         if canonicalized_type is None:
-            if enrich:
+            # 類似度マージゲート（SchemaCanonicalizer と対称）: LLMが「該当なし」でも、
+            # 最近傍の既存型とのコサイン類似度が閾値τ以上なら新規追加せず最近傍へ統合。
+            merge_threshold = float(os.environ.get("CANON_MERGE_THRESHOLD", "0.9"))
+            if candidate_types and candidate_scores and candidate_scores[0] >= merge_threshold:
+                canonicalized_type = next(iter(candidate_types))
+            elif enrich:
                 # Add unknown type to the vocabulary (mirrors enrich_schema).
                 definition = raw_type
                 self.type_dict[raw_type] = definition

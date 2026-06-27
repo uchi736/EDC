@@ -63,6 +63,7 @@ def get_vllm_client():
         _vllm_client = OpenAI(
             api_key=os.environ.get("VLLM_API_KEY", "dummy"),
             base_url=os.environ.get("VLLM_ENDPOINT", "http://localhost:8000/v1"),
+            timeout=float(os.environ.get("VLLM_TIMEOUT", "300")),
         )
     return _vllm_client
 
@@ -281,6 +282,7 @@ class VllmEmbedder:
             api_key=os.environ.get("VLLM_API_KEY", "dummy"),
             base_url=os.environ.get("VLLM_EMBEDDING_ENDPOINT",
                      os.environ.get("VLLM_ENDPOINT", "http://localhost:8000/v1")),
+            timeout=float(os.environ.get("VLLM_TIMEOUT", "300")),
         )
         self.model = os.environ.get("VLLM_EMBEDDING_MODEL", "default")
         self.prompts = {}  # SentenceTransformer compatibility
@@ -355,6 +357,9 @@ def openai_chat_completion(model, system_prompt, history, temperature=0, max_tok
     else:
         messages = history
 
+    # 無限リトライを防ぐため試行回数を上限化（エンドポイント停止時にハングしない）
+    max_retries = int(os.environ.get("VLLM_MAX_RETRIES", "5"))
+    attempt = 0
     while response is None:
         try:
             if is_model_azure(model):
@@ -387,7 +392,11 @@ def openai_chat_completion(model, system_prompt, history, temperature=0, max_tok
                     max_tokens=max_tokens
                 )
         except Exception as e:
-            logger.warning(f"API call failed: {e}, retrying in 5 seconds...")
+            attempt += 1
+            if attempt >= max_retries:
+                logger.error(f"API call failed after {attempt} attempts: {e}")
+                raise
+            logger.warning(f"API call failed: {e}, retrying in 5 seconds... ({attempt}/{max_retries})")
             time.sleep(5)
 
     content = response.choices[0].message.content

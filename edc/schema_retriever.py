@@ -39,23 +39,6 @@ class SchemaRetriever:
                 )
             self.target_schema_embedding_dict[relation] = embedding
 
-    def update_schema_embedding_dict(self):
-        for relation, relation_definition in self.target_schema_dict.items():
-            if relation in self.target_schema_embedding_dict:
-                continue
-            if self.finetuned_e5mistral:
-                embedding = llm_utils.get_embedding_e5mistral(
-                    self.embedding_model,
-                    self.embedding_tokenizer,
-                    relation_definition,
-                )
-            else:
-                embedding = llm_utils.get_embedding_sts(
-                    self.embedding_model,
-                    relation_definition,
-                )
-            self.target_schema_embedding_dict[relation] = embedding
-
     def retrieve_relevant_relations(self, query_input_text: str, top_k=10):
         target_relation_list = list(self.target_schema_embedding_dict.keys())
         target_relation_embedding_list = list(self.target_schema_embedding_dict.values())

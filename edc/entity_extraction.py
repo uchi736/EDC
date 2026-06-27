@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import edc.utils.llm_utils as llm_utils
 import re
-import numpy as np
 import copy
 
 
@@ -51,23 +50,3 @@ class EntityExtractor:
             completion = llm_utils.openai_chat_completion(self.openai_model, None, messages)
         extracted_entities = llm_utils.parse_raw_entities(completion)
         return extracted_entities
-
-    def retrieve_relevant_relations(self, query_input_text: str, top_k=10):
-        target_relation_list = list(self.target_schema_embedding_dict.keys())
-        target_relation_embedding_list = list(self.target_schema_embedding_dict.values())
-
-        query_embedding = llm_utils.get_embedding_e5mistral(
-            self.model,
-            self.tokenizer,
-            query_input_text,
-            "Retrieve descriptions of relations that are present in the given text.",
-        )
-        scores = np.array([query_embedding]) @ np.array(target_relation_embedding_list).T
-
-        scores = scores[0]
-        highest_score_indices = np.argsort(-scores)
-
-        return {
-            target_relation_list[idx]: self.target_schema_dict[target_relation_list[idx]]
-            for idx in highest_score_indices[:top_k]
-        }, [scores[idx] for idx in highest_score_indices[:top_k]]
