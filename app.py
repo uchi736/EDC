@@ -276,6 +276,23 @@ if typed_mode_ui:
         help="初期の型セット。空でも可（自由発見）。抽出・正規化で漏れた型は追加されます。",
     )
 
+# 文書タイプ・ルーティング（前段。EDC本体は無改変。選択時は標準スキーマを初期適用）
+st.subheader("文書タイプ（前段ルーティング・オプション）")
+try:
+    from doctype_router import load_registry
+    _registry = load_registry()
+    _doctype_names = [d["name"] for d in _registry.get("doctypes", [])]
+except Exception:
+    _registry = None
+    _doctype_names = []
+doctype_mode = st.selectbox(
+    "文書タイプ",
+    ["（使わない）", "自動判定(LLM)"] + _doctype_names,
+    index=0,
+    help="自動判定: 抽出時にLLMが文書タイプを分類し、該当タイプの標準スキーマ(骨格+ドメイン層)を初期スキーマとして適用。タイプ直接指定も可。",
+    disabled=(_registry is None),
+)
+
 # ============================================================
 # HITL 2フェーズ・ウィザード
 #   ① 抽出してスキーマ発見 (OIE + Schema Definition)
@@ -347,11 +364,29 @@ if st.button("① 抽出してスキーマ発見", type="primary", use_container
     seed_schema = _parse_csv_schema(uploaded_schema) if (use_schema and uploaded_schema is not None) else {}
     seed_types = _parse_csv_schema(uploaded_types) if (typed_mode_ui and uploaded_types is not None) else {}
 
+    # 文書タイプ・ルーティング: 選択時はLLM分類→該当タイプの標準スキーマを初期スキーマに採用
+    routed_typed = False
+    if _registry is not None and doctype_mode != "（使わない）":
+        from doctype_router import resolve, _read_kv_csv
+        sample = "\n".join(input_texts[:40])[:3000]
+        _mode = "auto" if doctype_mode == "自動判定(LLM)" else doctype_mode
+        with st.spinner("文書タイプを判定中..."):
+            dt_name, sp, tp, cls = resolve(sample, _registry, doctype=_mode)
+        if cls is not None:
+            st.info(f"📑 文書タイプ判定: **{dt_name}** (conf={cls.get('confidence')}) — {cls.get('reason','')}")
+        if sp:
+            seed_schema = _read_kv_csv(sp)
+            seed_types = _read_kv_csv(tp)
+            routed_typed = True
+            st.success(f"標準スキーマを初期適用: {dt_name}（関係{len(seed_schema)} / 型{len(seed_types)}）")
+        else:
+            st.warning(f"該当タイプなし({dt_name}) → フリー発見にフォールバック")
+
     try:
         from edc.edc_framework import EDC
         with st.spinner("① OIE + スキーマ定義を実行中...（LLM呼び出し）"):
             edc = EDC(**build_edc_config(llm_model, embedder_model))
-            if typed_mode_ui:
+            if typed_mode_ui or routed_typed:
                 # typedモードを有効化（initial_types_path 無しでも enrich_types で起動）
                 edc.enrich_types = True
                 edc.types = dict(seed_types)  # 初期型スキーマでOIEを誘導

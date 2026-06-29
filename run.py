@@ -239,6 +239,15 @@ if __name__ == "__main__":
              "未指定時は .env の LLM_PROVIDER を使用（完全ローカル運用では vllm）。",
     )
 
+    # Document-type router (前段): 文書を分類し、該当タイプの標準スキーマを自動選択
+    parser.add_argument(
+        "--doctype",
+        default=None,
+        help="文書タイプ・ルーティング。'auto'で入力をLLM分類し schemas/registry.json の"
+             "該当タイプの標準スキーマ(骨格+ドメイン層)を自動適用。タイプ名を直接指定も可。"
+             "未指定なら従来通り(--target_schema_path/フリー発見)。",
+    )
+
     # Output setting
     parser.add_argument("--output_dir", default="./output/tmp", help="Directory to output to.")
     parser.add_argument("--logging_verbose", action="store_const", dest="loglevel", const=logging.INFO)
@@ -312,6 +321,23 @@ if __name__ == "__main__":
         exit(1)
 
     print(f"Total: {len(input_texts)} texts from {len(file_boundaries)} file(s)")
+
+    # --- Phase 1.5: 文書タイプ・ルーティング（前段。EDC本体は無改変）---
+    if args.get("doctype"):
+        from doctype_router import load_registry, resolve
+        registry = load_registry()
+        sample = "\n".join(input_texts[:40])[:3000]
+        dt_name, schema_path, types_path, cls = resolve(sample, registry, doctype=args["doctype"])
+        if cls is not None:
+            print(f"[doctype] 分類: {dt_name} (conf={cls.get('confidence')}) - {cls.get('reason','')}")
+        if schema_path:
+            args["target_schema_path"] = schema_path
+            args["enrich_schema"] = True  # ドメイン外は漏れ追加(類似度マージゲートで抑制)
+            args["target_types_path"] = types_path
+            args["enrich_types"] = True
+            print(f"[doctype] 標準スキーマ適用: {dt_name} (schema/types を自動セット)")
+        else:
+            print(f"[doctype] 該当タイプなし({dt_name}) → 従来設定/フリー発見にフォールバック")
 
     # --- Phase 2: EDC実行 ---
     edc = EDC(**args)
