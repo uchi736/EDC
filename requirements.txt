@@ -11,6 +11,11 @@ torch>=2.0.0
 # UI
 streamlit>=1.28.0
 
+# HTTP API (外部RAGアプリ/Dify から呼ぶ場合。api.py を uvicorn で起動)
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9
+
 # Utilities
 pandas>=2.0.0
 numpy>=1.24.0
