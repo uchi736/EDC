@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EDC のしくみ — 文書から知識グラフができるまで</title>
+<style>
+  :root{
+    /* cool slate neutrals with a faint pine bias */
+    --ground:#f3f6f5; --paper:#ffffff; --sunk:#eef2f1;
+    --ink:#13201d; --ink-2:#374440; --muted:#65726d; --faint:#9aa6a1;
+    --line:#dfe6e3; --line-2:#eaefed;
+    /* stage accents: Extract=indigo · Define=amber · Canon=pine */
+    --pine:#0d6f63; --pine-ink:#0a544b; --pine-bg:#e2f0ec; --pine-line:#a4d2c9;
+    --indigo:#4a5691; --indigo-ink:#3a4676; --indigo-bg:#e9ebf6; --indigo-line:#c3c8e6;
+    --amber:#b0680f; --amber-ink:#8c5209; --amber-bg:#faecd5; --amber-line:#ecca90;
+    --rose:#a5433d; --rose-bg:#f6e3e1; --rose-line:#e2b6b3;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Consolas,"Noto Sans Mono",monospace;
+    --shadow:0 1px 2px rgba(13,32,29,.04),0 4px 16px rgba(13,32,29,.05);
+    --maxw:1080px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#0d1513; --paper:#131e1b; --sunk:#0f1917;
+      --ink:#e7efec; --ink-2:#b3c1bc; --muted:#869590; --faint:#5e6d67;
+      --line:#22302c; --line-2:#1a2724;
+      --pine:#4bbfae; --pine-ink:#7fd6c8; --pine-bg:#12332e; --pine-line:#1f4a43;
+      --indigo:#8f9bd6; --indigo-ink:#aab4e2; --indigo-bg:#1c2340; --indigo-line:#2f3968;
+      --amber:#e0a24e; --amber-ink:#eeb968; --amber-bg:#3a2a10; --amber-line:#5a4118;
+      --rose:#df8f8a; --rose-bg:#3a1e1c; --rose-line:#5a2d2a;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#f3f6f5; --paper:#ffffff; --sunk:#eef2f1;
+    --ink:#13201d; --ink-2:#374440; --muted:#65726d; --faint:#9aa6a1;
+    --line:#dfe6e3; --line-2:#eaefed;
+    --pine:#0d6f63; --pine-ink:#0a544b; --pine-bg:#e2f0ec; --pine-line:#a4d2c9;
+    --indigo:#4a5691; --indigo-ink:#3a4676; --indigo-bg:#e9ebf6; --indigo-line:#c3c8e6;
+    --amber:#b0680f; --amber-ink:#8c5209; --amber-bg:#faecd5; --amber-line:#ecca90;
+    --rose:#a5433d; --rose-bg:#f6e3e1; --rose-line:#e2b6b3;
+    --shadow:0 1px 2px rgba(13,32,29,.04),0 4px 16px rgba(13,32,29,.05);
+  }
+  :root[data-theme="dark"]{
+    --ground:#0d1513; --paper:#131e1b; --sunk:#0f1917;
+    --ink:#e7efec; --ink-2:#b3c1bc; --muted:#869590; --faint:#5e6d67;
+    --line:#22302c; --line-2:#1a2724;
+    --pine:#4bbfae; --pine-ink:#7fd6c8; --pine-bg:#12332e; --pine-line:#1f4a43;
+    --indigo:#8f9bd6; --indigo-ink:#aab4e2; --indigo-bg:#1c2340; --indigo-line:#2f3968;
+    --amber:#e0a24e; --amber-ink:#eeb968; --amber-bg:#3a2a10; --amber-line:#5a4118;
+    --rose:#df8f8a; --rose-bg:#3a1e1c; --rose-line:#5a2d2a;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    line-height:1.72;font-size:15.5px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
+  code{font-family:var(--mono);font-size:.86em;background:var(--sunk);
+    border:1px solid var(--line);padding:.05em .4em;border-radius:5px}
+  h2{font-size:22px;line-height:1.3;margin:0;letter-spacing:-.01em;font-weight:700;text-wrap:balance}
+  p{margin:0}
+
+  /* ---------- hero ---------- */
+  header.hero{position:relative;overflow:hidden;
+    background:
+      radial-gradient(120% 130% at 88% -10%, rgba(13,111,99,.18), transparent 55%),
+      radial-gradient(90% 120% at 0% 110%, rgba(74,86,145,.14), transparent 55%),
+      linear-gradient(180deg,var(--paper),var(--ground));
+    border-bottom:1px solid var(--line)}
+  .hero .wrap{padding:56px 22px 50px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--pine);margin:0 0 16px;font-weight:600}
+  .hero h1{font-size:clamp(28px,5.2vw,44px);line-height:1.14;margin:0 0 18px;
+    letter-spacing:-.02em;font-weight:760;text-wrap:balance;max-width:16ch}
+  .hero h1 .hl{color:var(--pine-ink)}
+  .hero p.lead{font-size:clamp(15.5px,2.1vw,18px);color:var(--ink-2);max-width:56ch;margin:0}
+  .flow-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:30px}
+  .chip{font-family:var(--mono);font-size:12px;font-weight:600;padding:7px 13px;border-radius:8px;
+    border:1px solid var(--line);background:var(--paper);color:var(--ink-2);white-space:nowrap}
+  .chip.doc{border-color:var(--line)}
+  .chip.e{background:var(--indigo-bg);border-color:var(--indigo-line);color:var(--indigo-ink)}
+  .chip.d{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber-ink)}
+  .chip.c{background:var(--pine-bg);border-color:var(--pine-line);color:var(--pine-ink)}
+  .chip.kg{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .arrow{color:var(--faint);font-size:15px}
+
+  /* ---------- section frame ---------- */
+  main{padding:8px 0 40px}
+  section{padding:44px 0;border-top:1px solid var(--line-2)}
+  section:first-child{border-top:0}
+  .shead{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+  .snum{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--pine);
+    border:1px solid var(--pine-line);background:var(--pine-bg);border-radius:6px;
+    padding:2px 8px;flex:0 0 auto;letter-spacing:.02em}
+  .sdesc{color:var(--muted);margin:10px 0 26px;max-width:64ch;font-size:14.5px}
+
+  /* ---------- pipeline (E → D → C) ---------- */
+  .pipe{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}
+  .stage{position:relative;background:var(--paper);border:1px solid var(--line);
+    border-radius:14px;padding:18px 18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+  .stage::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:3px}
+  .stage.e::before{background:var(--indigo)}
+  .stage.d::before{background:var(--amber)}
+  .stage.c::before{background:var(--pine)}
+  .stage .tag{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.12em;
+    text-transform:uppercase;margin:0 0 4px}
+  .stage.e .tag{color:var(--indigo)}
+  .stage.d .tag{color:var(--amber)}
+  .stage.c .tag{color:var(--pine)}
+  .stage h3{margin:0 0 4px;font-size:17px;font-weight:700;letter-spacing:-.01em}
+  .stage .role{font-size:13px;color:var(--muted);margin:0 0 14px;min-height:2.4em}
+  .stage .io{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.02em;
+    margin-bottom:6px;text-transform:uppercase}
+  .card{background:var(--sunk);border:1px solid var(--line);border-radius:10px;
+    padding:11px 12px;font-size:13px;margin-top:auto}
+  .card .lbl{font-family:var(--mono);font-size:10.5px;color:var(--faint);
+    text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:5px}
+  .triple{font-family:var(--mono);font-size:12.5px;line-height:1.9;word-break:break-word}
+  .triple .s{color:var(--ink);font-weight:600}
+  .triple .r{color:var(--amber-ink);font-weight:700}
+  .triple .rc{color:var(--pine-ink);font-weight:700}
+  .triple .o{color:var(--ink);font-weight:600}
+  .triple .ty{color:var(--muted);font-weight:400}
+  .pipe .connect{display:none}
+
+  /* worked-example banner */
+  .exline{background:var(--paper);border:1px dashed var(--line);border-left:3px solid var(--faint);
+    border-radius:10px;padding:12px 15px;margin-bottom:22px;font-size:14px;color:var(--ink-2)}
+  .exline b{color:var(--ink);font-weight:600}
+  .exline .q{font-family:var(--mono);font-size:13px;background:var(--sunk);padding:1px 6px;border-radius:5px;border:1px solid var(--line)}
+
+  /* ---------- generic diagram grid ---------- */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .box{background:var(--paper);border:1px solid var(--line);border-radius:13px;
+    padding:18px;box-shadow:var(--shadow)}
+  .box h3{margin:0 0 3px;font-size:15.5px;font-weight:700}
+  .box .sub{font-size:12.5px;color:var(--muted);margin:0 0 13px}
+  .pillrow{display:flex;flex-wrap:wrap;gap:6px}
+  .pill{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;
+    border:1px solid var(--line);background:var(--sunk);color:var(--ink-2)}
+  .pill.b{background:var(--pine-bg);border-color:var(--pine-line);color:var(--pine-ink)}
+  .pill.i{background:var(--indigo-bg);border-color:var(--indigo-line);color:var(--indigo-ink)}
+  .pill.a{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber-ink)}
+  .pill.r{background:var(--rose-bg);border-color:var(--rose-line);color:var(--rose)}
+
+  .layerlead{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;margin:0 0 9px;display:flex;align-items:center;gap:8px}
+  .layerlead .n{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;
+    border-radius:6px;font-size:11px;color:var(--paper)}
+  .n.n1{background:var(--pine)} .n.n2{background:var(--indigo)} .n.n3{background:var(--rose)}
+
+  /* ---------- gate flow ---------- */
+  .gate{display:flex;flex-direction:column;gap:0}
+  .gnode{display:flex;gap:13px;align-items:flex-start;position:relative;padding:0 0 4px}
+  .gnode .stem{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;padding-top:4px}
+  .dot{width:13px;height:13px;border-radius:50%;border:2.5px solid var(--pine);background:var(--paper);flex:0 0 auto}
+  .dot.q{border-color:var(--amber);border-radius:3px}
+  .dot.end{background:var(--pine);border-color:var(--pine)}
+  .dot.drop{border-color:var(--rose)}
+  .line{width:2px;flex:1;background:var(--line);min-height:14px}
+  .gbody{padding-bottom:16px;flex:1}
+  .gbody .t{font-size:14px;font-weight:600;margin:0}
+  .gbody .d{font-size:12.5px;color:var(--muted);margin:2px 0 0}
+  .branch{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+  .brtag{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 9px;border-radius:7px;border:1px solid}
+  .brtag.yes{color:var(--pine-ink);background:var(--pine-bg);border-color:var(--pine-line)}
+  .brtag.no{color:var(--rose);background:var(--rose-bg);border-color:var(--rose-line)}
+
+  /* ---------- surfaces (3 clients → 1 core) ---------- */
+  .surfaces{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+  .converge{text-align:center;color:var(--faint);font-size:22px;line-height:1;margin:2px 0 12px}
+  .corebar{background:var(--ink);color:var(--paper);border-radius:13px;padding:18px 20px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .corebar .k{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--pine)}
+  .corebar h3{margin:2px 0 0;font-size:18px;font-weight:720}
+  .corebar .steps{display:flex;gap:8px;flex-wrap:wrap}
+  .cstep{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:8px;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#dfe9e6}
+
+  /* ---------- onprem ---------- */
+  .onprem{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}
+  .stackcol{display:flex;flex-direction:column;gap:10px}
+  .svc{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:13px 15px;box-shadow:var(--shadow)}
+  .svc .n{font-weight:700;font-size:14px;margin:0}
+  .svc .p{font-family:var(--mono);font-size:11.5px;color:var(--pine-ink);margin:2px 0 0}
+  .svc .d{font-size:12px;color:var(--muted);margin:5px 0 0}
+  .bridge{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);
+    font-family:var(--mono);font-size:11px;text-align:center}
+  .bridge .barb{font-size:20px;color:var(--pine)}
+  .frame-label{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 10px}
+  .onprem-note{margin-top:16px;background:var(--pine-bg);border:1px solid var(--pine-line);
+    border-radius:11px;padding:13px 16px;font-size:13.5px;color:var(--pine-ink)}
+  .onprem-note b{font-weight:700}
+
+  /* ---------- data model ---------- */
+  .models{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .tuple{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--mono);
+    font-size:13px;margin-top:10px}
+  .node{padding:7px 11px;border-radius:9px;font-weight:600;border:1px solid}
+  .node.ent{background:var(--sunk);border-color:var(--line);color:var(--ink)}
+  .node.rel{background:var(--pine-bg);border-color:var(--pine-line);color:var(--pine-ink)}
+  .node .type{display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:1px}
+  .edge{color:var(--faint);font-size:16px}
+
+  footer{border-top:1px solid var(--line);padding:26px 0 60px;color:var(--muted);font-size:13px}
+  footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  footer a{color:var(--pine-ink)}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:820px){
+    .pipe{grid-template-columns:1fr}
+    .grid2,.grid3,.models,.surfaces{grid-template-columns:1fr}
+    .onprem{grid-template-columns:1fr}
+    .bridge{flex-direction:row;justify-content:center}
+    .bridge .barb{transform:rotate(90deg)}
+    .stage .role{min-height:0}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Extract · Define · Canonicalize</p>
+    <h1>社内文書から、<span class="hl">知識グラフ</span>を<br>自動でつくる仕組み</h1>
+    <p class="lead">不適合報告書・規程・技術文書などの非構造テキストを、LLMで「主語 → 関係 → 目的語」のトリプルに変換します。データは一切外部に出さず、すべて社内サーバー上で完結します。</p>
+    <div class="flow-strip" aria-label="全体の流れ">
+      <span class="chip doc">📄 文書</span>
+      <span class="arrow">→</span>
+      <span class="chip e">Extract 抽出</span>
+      <span class="arrow">→</span>
+      <span class="chip d">Define 定義</span>
+      <span class="arrow">→</span>
+      <span class="chip c">Canonicalize 正規化</span>
+      <span class="arrow">→</span>
+      <span class="chip kg">🕸 知識グラフ</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 1. 中核パイプライン -->
+  <section id="pipeline">
+    <div class="shead"><span class="snum">01</span><h2>中核：文書の1文が知識グラフになるまで</h2></div>
+    <p class="sdesc">EDC は3つのステージを順に通します。ここでは実際の不適合報告書の1文を追いかけ、各ステージで何が起きるかを見ます。</p>
+
+    <div class="exline">
+      <b>入力の1文：</b> <span class="q">溶接部の予熱不足が低温割れの原因となった。</span> — この文をパイプラインに流します。
+    </div>
+
+    <div class="pipe">
+      <div class="stage e">
+        <p class="tag">Stage 1 · Extract</p>
+        <h3>抽出（OIE）</h3>
+        <p class="role">文からエンティティと関係を、スキーマにとらわれず“素のまま”取り出す。</p>
+        <p class="io">出力：素のトリプル</p>
+        <div class="card">
+          <span class="lbl">raw triple</span>
+          <div class="triple"><span class="s">予熱不足</span> ―<span class="r">原因となった</span>→ <span class="o">低温割れ</span></div>
+        </div>
+      </div>
+
+      <div class="stage d">
+        <p class="tag">Stage 2 · Define</p>
+        <h3>定義</h3>
+        <p class="role">抽出された関係が「何を意味するか」を LLM に一文で定義させる。</p>
+        <p class="io">出力：関係の定義文</p>
+        <div class="card">
+          <span class="lbl">definition</span>
+          <div class="triple"><span class="r">原因となった</span>：<span class="ty">主語が目的語を引き起こす／発生の原因となる関係。</span></div>
+        </div>
+      </div>
+
+      <div class="stage c">
+        <p class="tag">Stage 3 · Canonicalize</p>
+        <h3>正規化</h3>
+        <p class="role">定義をもとに埋め込み検索＋LLM検証で、標準スキーマの関係へ寄せる。</p>
+        <p class="io">出力：確定トリプル</p>
+        <div class="card">
+          <span class="lbl">canonical triple</span>
+          <div class="triple"><span class="s">予熱不足</span><span class="ty">:Cause</span> ―<span class="rc">CAUSES</span>→ <span class="o">低温割れ</span><span class="ty">:Defect</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. スキーマ3層 -->
+  <section id="schema">
+    <div class="shead"><span class="snum">02</span><h2>スキーマは3層で「増えすぎ」を防ぐ</h2></div>
+    <p class="sdesc">正規化の寄せ先となる関係の一覧（スキーマ）は3層構造。定型は固定し、それ以外だけを半自動で足すことで、関係が際限なく増えるのを抑えます。</p>
+
+    <div class="grid3">
+      <div class="box">
+        <p class="layerlead"><span class="n n1">1</span>不変骨格</p>
+        <h3>全文書で共通・手で固定</h3>
+        <p class="sub">文書タイプに依存しない土台。必ず含める関係の閉集合。</p>
+        <div class="pillrow">
+          <span class="pill b">DEFINES</span><span class="pill b">MENTIONS</span>
+          <span class="pill b">REFERS_TO</span><span class="pill b">IS_A</span><span class="pill b">PART_OF</span>
+        </div>
+      </div>
+      <div class="box">
+        <p class="layerlead"><span class="n n2">2</span>ドメイン層</p>
+        <h3>文書タイプ別・昇格制</h3>
+        <p class="sub">NCR・規程・論文など、タイプ固有の関係。新タイプ登場時だけ追加。</p>
+        <div class="pillrow">
+          <span class="pill i">CAUSES</span><span class="pill i">MITIGATES</span>
+          <span class="pill i">APPLIES_TO</span><span class="pill i">REQUIRES_APPROVAL_FROM</span><span class="pill i">DEPENDS_ON</span>
+        </div>
+      </div>
+      <div class="box">
+        <p class="layerlead"><span class="n n3">3</span>連結層</p>
+        <h3>名寄せ・エッジにしない</h3>
+        <p class="sub">同一・別名はエッジではなくノード統合で処理（1実体=1ノード）。</p>
+        <div class="pillrow">
+          <span class="pill r">SAME_AS → マージ</span><span class="pill r">ALIAS_OF → 別名属性</span>
+        </div>
+      </div>
+    </div>
+    <p class="sdesc" style="margin-top:16px">前段のルーターが文書タイプを判定し、<b>「不変骨格 ∪ そのタイプのドメイン層」</b>を合成して正規化の寄せ先に渡します。</p>
+  </section>
+
+  <!-- 3. マージゲート -->
+  <section id="gate">
+    <div class="shead"><span class="snum">03</span><h2>正規化の判断ロジック：類似度マージゲート</h2></div>
+    <p class="sdesc">抽出された関係を1つずつ、この分岐にかけます。「初期スキーマに寄せる／近い既存に統合する／本当に新しいものだけ追加する」を自動で振り分け、スキーマの肥大化を防ぐ中核です。</p>
+
+    <div class="box">
+      <div class="gate">
+        <div class="gnode">
+          <div class="stem"><span class="dot"></span><span class="line"></span></div>
+          <div class="gbody"><p class="t">生の関係／型が入力される</p><p class="d">例：<code>原因となった</code></p></div>
+        </div>
+        <div class="gnode">
+          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
+          <div class="gbody">
+            <p class="t">確定スキーマに既にある？</p>
+            <div class="branch"><span class="brtag yes">Yes → そのまま採用</span><span class="brtag no">No → 次へ</span></div>
+          </div>
+        </div>
+        <div class="gnode">
+          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
+          <div class="gbody">
+            <p class="t">埋め込み top-k 検索 ＋ LLM が候補から合致を選ぶ？</p>
+            <p class="d">意味の近い既存の関係を探し、LLMが「これと同じか」を検証</p>
+            <div class="branch"><span class="brtag yes">Yes → 既存へマッピング</span><span class="brtag no">No → 次へ</span></div>
+          </div>
+        </div>
+        <div class="gnode">
+          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
+          <div class="gbody">
+            <p class="t">最近傍との類似度 cos ≥ τ（既定 0.9）？</p>
+            <p class="d">閾値以上なら「言い換えレベルに近い」とみなす</p>
+            <div class="branch"><span class="brtag yes">Yes → 最近傍へ統合（近傍同義を吸収）</span><span class="brtag no">No → 次へ</span></div>
+          </div>
+        </div>
+        <div class="gnode">
+          <div class="stem"><span class="dot end"></span><span class="line" style="background:transparent"></span></div>
+          <div class="gbody">
+            <p class="t">本当に新しい概念だけを判定</p>
+            <div class="branch"><span class="brtag yes">enrich オン → 新規スキーマとして追加</span><span class="brtag no">オフ → 除外 / Other</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="sdesc" style="margin-top:16px">実測では、フリー発見で <b>95 種</b> に膨らんだ関係が、ドメイン初期スキーマ＋このゲートで <b>24 種</b> に収束しました。</p>
+  </section>
+
+  <!-- 4. 3つの使い方 -->
+  <section id="surfaces">
+    <div class="shead"><span class="snum">04</span><h2>3つの入り口が、同じコアを共有</h2></div>
+    <p class="sdesc">バッチ処理・人手レビュー・外部連携の3つの使い方があり、いずれも同じ EDC コア（E→D→C）を呼びます。</p>
+
+    <div class="surfaces">
+      <div class="box">
+        <h3>run.py</h3>
+        <p class="sub">CLI バッチ</p>
+        <p style="font-size:13px;color:var(--ink-2);margin:0">フォルダ内の .txt/.pdf/.md をまとめて処理し、triplets.json を書き出す。</p>
+      </div>
+      <div class="box">
+        <h3>app.py</h3>
+        <p class="sub">Streamlit（HITL）</p>
+        <p style="font-size:13px;color:var(--ink-2);margin:0">抽出→<b>人がスキーマをレビュー・修正</b>→正規化。精度を人手で高める2フェーズ運用。</p>
+      </div>
+      <div class="box">
+        <h3>api.py</h3>
+        <p class="sub">FastAPI（:8080）</p>
+        <p style="font-size:13px;color:var(--ink-2);margin:0">Dify や他 RAG アプリから <code>POST /extract</code> で呼べる HTTP API。</p>
+      </div>
+    </div>
+    <div class="converge">▼</div>
+    <div class="corebar">
+      <div>
+        <p class="k">shared core · edc/</p>
+        <h3>EDC 本体</h3>
+      </div>
+      <div class="steps">
+        <span class="cstep">Extract</span>
+        <span class="cstep">Define</span>
+        <span class="cstep">Canonicalize</span>
+        <span class="cstep">Type Canon.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. 完全オンプレ -->
+  <section id="onprem">
+    <div class="shead"><span class="snum">05</span><h2>完全オンプレ：データは社内から出ない</h2></div>
+    <p class="sdesc">アプリ層は軽量で、LLM・埋め込み・OCR という重い処理は社内 DGX Spark に HTTP で委譲します。外部サービスへの送信はゼロです。</p>
+
+    <div class="onprem">
+      <div>
+        <p class="frame-label">アプリ層（軽量コンテナ）</p>
+        <div class="stackcol">
+          <div class="svc"><p class="n">api.py / run.py / app.py</p><p class="d">EDC コア＋文書タイプ・ルーター。torch 不要のスリム構成。</p></div>
+          <div class="svc"><p class="n">pdf_processor.py</p><p class="d">PDF はOCRへ、txt/md はチャンク分割。</p></div>
+        </div>
+      </div>
+      <div class="bridge">
+        <span class="barb">→</span>
+        <span>LAN 内<br>HTTP のみ</span>
+      </div>
+      <div>
+        <p class="frame-label">DGX Spark（社内・完全ローカル）</p>
+        <div class="stackcol">
+          <div class="svc"><p class="n">vLLM · Chat LLM</p><p class="p">:8000</p><p class="d">抽出・定義・正規化検証を担う LLM。</p></div>
+          <div class="svc"><p class="n">vLLM · Embedding</p><p class="p">:8003</p><p class="d">関係・型の類似度検索用の埋め込み。</p></div>
+          <div class="svc"><p class="n">PaddleX · OCR</p><p class="p">:8005</p><p class="d">PDF をページ単位でテキスト化。</p></div>
+        </div>
+      </div>
+    </div>
+    <p class="onprem-note"><b>ポイント：</b>アプリ層は「頭脳」を持たず、すべての推論を社内サーバーへ委譲する薄い殻。だからコンテナは軽く、機密文書も社外に一切出ません。</p>
+  </section>
+
+  <!-- 6. データモデル -->
+  <section id="model">
+    <div class="shead"><span class="snum">06</span><h2>出てくるもの：2種類のトリプル</h2></div>
+    <p class="sdesc">最終成果は知識グラフのトリプル。既定は3タプル、typed モードでは型付きの5タプルになります。</p>
+
+    <div class="models">
+      <div class="box">
+        <h3>3タプル<span style="color:var(--muted);font-weight:400;font-size:13px"> ・ untyped（既定）</span></h3>
+        <p class="sub">主語 → 関係 → 目的語</p>
+        <div class="tuple">
+          <span class="node ent">予熱不足</span>
+          <span class="edge">―</span>
+          <span class="node rel">CAUSES</span>
+          <span class="edge">→</span>
+          <span class="node ent">低温割れ</span>
+        </div>
+      </div>
+      <div class="box">
+        <h3>5タプル<span style="color:var(--muted);font-weight:400;font-size:13px"> ・ typed モード</span></h3>
+        <p class="sub">エンティティに型が付き、型も正規化される</p>
+        <div class="tuple">
+          <span class="node ent">予熱不足<span class="type">Cause</span></span>
+          <span class="edge">―</span>
+          <span class="node rel">CAUSES</span>
+          <span class="edge">→</span>
+          <span class="node ent">低温割れ<span class="type">Defect</span></span>
+        </div>
+      </div>
+    </div>
+    <p class="sdesc" style="margin-top:16px">出力は <code>triplets.json</code>（ファイル別トリプル）と <code>discovered_schema.csv</code>（発見した関係と件数）。API では JSON で返ります。</p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>EDC — Extract, Define, Canonicalize ／ 完全オンプレ ナレッジグラフ構築</span>
+    <span>詳細な設計は <a href="./DESIGN.md">DESIGN.md</a> / <a href="./DESIGN.html">DESIGN.html</a> を参照</span>
+  </div>
+</footer>
+
+</body>
+</html>
