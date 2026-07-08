@@ -39,7 +39,7 @@ flowchart LR
     Schemas[("schemas/<br/>registry.json + CSV群")]
   end
 
-  subgraph DGX["DGX Spark 192.168.0.250 (完全オンプレ)"]
+  subgraph DGX["DGX Spark ${DGX_HOST} (完全オンプレ)"]
     LLM["vLLM: gemma-4 26B<br/>:8000 (Chat)"]
     EMB["vLLM: ruri-v3-310m<br/>:8003 (Embedding)"]
     OCR["PaddleX PP-OCRv5<br/>:8005 (OCR)"]
@@ -267,7 +267,7 @@ flowchart LR
     end
     Env[".env (env_file で注入)<br/>VLLM_* / PADDLEX_* / CANON_*"]
   end
-  subgraph DGX["DGX Spark 192.168.0.250"]
+  subgraph DGX["DGX Spark ${DGX_HOST}"]
     S1["vLLM :8000 / :8003"]
     S2["PaddleX :8005"]
   end
