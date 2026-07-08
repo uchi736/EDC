@@ -3,22 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EDC のしくみ — 文書から知識グラフができるまで</title>
+<title>EDC のしくみ — 詳細ロジック解説</title>
 <style>
   :root{
-    /* cool slate neutrals with a faint pine bias */
     --ground:#f3f6f5; --paper:#ffffff; --sunk:#eef2f1;
     --ink:#13201d; --ink-2:#374440; --muted:#65726d; --faint:#9aa6a1;
     --line:#dfe6e3; --line-2:#eaefed;
-    /* stage accents: Extract=indigo · Define=amber · Canon=pine */
     --pine:#0d6f63; --pine-ink:#0a544b; --pine-bg:#e2f0ec; --pine-line:#a4d2c9;
     --indigo:#4a5691; --indigo-ink:#3a4676; --indigo-bg:#e9ebf6; --indigo-line:#c3c8e6;
     --amber:#b0680f; --amber-ink:#8c5209; --amber-bg:#faecd5; --amber-line:#ecca90;
-    --rose:#a5433d; --rose-bg:#f6e3e1; --rose-line:#e2b6b3;
+    --rose:#a5433d; --rose-ink:#8a352f; --rose-bg:#f6e3e1; --rose-line:#e2b6b3;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;
     --mono:ui-monospace,"SF Mono","Cascadia Code",Consolas,"Noto Sans Mono",monospace;
     --shadow:0 1px 2px rgba(13,32,29,.04),0 4px 16px rgba(13,32,29,.05);
-    --maxw:1080px;
+    --maxw:1120px;
   }
   @media (prefers-color-scheme:dark){
     :root{
@@ -28,7 +26,7 @@
       --pine:#4bbfae; --pine-ink:#7fd6c8; --pine-bg:#12332e; --pine-line:#1f4a43;
       --indigo:#8f9bd6; --indigo-ink:#aab4e2; --indigo-bg:#1c2340; --indigo-line:#2f3968;
       --amber:#e0a24e; --amber-ink:#eeb968; --amber-bg:#3a2a10; --amber-line:#5a4118;
-      --rose:#df8f8a; --rose-bg:#3a1e1c; --rose-line:#5a2d2a;
+      --rose:#df8f8a; --rose-ink:#e8a5a0; --rose-bg:#3a1e1c; --rose-line:#5a2d2a;
       --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
     }
   }
@@ -39,7 +37,7 @@
     --pine:#0d6f63; --pine-ink:#0a544b; --pine-bg:#e2f0ec; --pine-line:#a4d2c9;
     --indigo:#4a5691; --indigo-ink:#3a4676; --indigo-bg:#e9ebf6; --indigo-line:#c3c8e6;
     --amber:#b0680f; --amber-ink:#8c5209; --amber-bg:#faecd5; --amber-line:#ecca90;
-    --rose:#a5433d; --rose-bg:#f6e3e1; --rose-line:#e2b6b3;
+    --rose:#a5433d; --rose-ink:#8a352f; --rose-bg:#f6e3e1; --rose-line:#e2b6b3;
     --shadow:0 1px 2px rgba(13,32,29,.04),0 4px 16px rgba(13,32,29,.05);
   }
   :root[data-theme="dark"]{
@@ -49,7 +47,7 @@
     --pine:#4bbfae; --pine-ink:#7fd6c8; --pine-bg:#12332e; --pine-line:#1f4a43;
     --indigo:#8f9bd6; --indigo-ink:#aab4e2; --indigo-bg:#1c2340; --indigo-line:#2f3968;
     --amber:#e0a24e; --amber-ink:#eeb968; --amber-bg:#3a2a10; --amber-line:#5a4118;
-    --rose:#df8f8a; --rose-bg:#3a1e1c; --rose-line:#5a2d2a;
+    --rose:#df8f8a; --rose-ink:#e8a5a0; --rose-bg:#3a1e1c; --rose-line:#5a2d2a;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
   }
 
@@ -59,167 +57,167 @@
   body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
     line-height:1.72;font-size:15.5px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
-  code{font-family:var(--mono);font-size:.86em;background:var(--sunk);
-    border:1px solid var(--line);padding:.05em .4em;border-radius:5px}
+  code{font-family:var(--mono);font-size:.85em;background:var(--sunk);
+    border:1px solid var(--line);padding:.05em .4em;border-radius:5px;color:var(--ink-2)}
   h2{font-size:22px;line-height:1.3;margin:0;letter-spacing:-.01em;font-weight:700;text-wrap:balance}
   p{margin:0}
+  strong,b{font-weight:700}
 
-  /* ---------- hero ---------- */
+  /* hero */
   header.hero{position:relative;overflow:hidden;
     background:
       radial-gradient(120% 130% at 88% -10%, rgba(13,111,99,.18), transparent 55%),
       radial-gradient(90% 120% at 0% 110%, rgba(74,86,145,.14), transparent 55%),
       linear-gradient(180deg,var(--paper),var(--ground));
     border-bottom:1px solid var(--line)}
-  .hero .wrap{padding:56px 22px 50px}
+  .hero .wrap{padding:52px 22px 46px}
   .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;
-    color:var(--pine);margin:0 0 16px;font-weight:600}
-  .hero h1{font-size:clamp(28px,5.2vw,44px);line-height:1.14;margin:0 0 18px;
-    letter-spacing:-.02em;font-weight:760;text-wrap:balance;max-width:16ch}
+    color:var(--pine);margin:0 0 15px;font-weight:600}
+  .hero h1{font-size:clamp(27px,5vw,42px);line-height:1.15;margin:0 0 16px;
+    letter-spacing:-.02em;font-weight:760;text-wrap:balance;max-width:20ch}
   .hero h1 .hl{color:var(--pine-ink)}
-  .hero p.lead{font-size:clamp(15.5px,2.1vw,18px);color:var(--ink-2);max-width:56ch;margin:0}
-  .flow-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:30px}
-  .chip{font-family:var(--mono);font-size:12px;font-weight:600;padding:7px 13px;border-radius:8px;
+  .hero p.lead{font-size:clamp(15px,2vw,17.5px);color:var(--ink-2);max-width:60ch;margin:0}
+  .flow-strip{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:26px}
+  .chip{font-family:var(--mono);font-size:12px;font-weight:600;padding:7px 12px;border-radius:8px;
     border:1px solid var(--line);background:var(--paper);color:var(--ink-2);white-space:nowrap}
-  .chip.doc{border-color:var(--line)}
   .chip.e{background:var(--indigo-bg);border-color:var(--indigo-line);color:var(--indigo-ink)}
   .chip.d{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber-ink)}
   .chip.c{background:var(--pine-bg);border-color:var(--pine-line);color:var(--pine-ink)}
   .chip.kg{background:var(--ink);color:var(--paper);border-color:var(--ink)}
   .arrow{color:var(--faint);font-size:15px}
 
-  /* ---------- section frame ---------- */
-  main{padding:8px 0 40px}
-  section{padding:44px 0;border-top:1px solid var(--line-2)}
-  section:first-child{border-top:0}
-  .shead{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+  /* section frame */
+  main{padding:6px 0 40px}
+  section{padding:42px 0;border-top:1px solid var(--line-2)}
+  .shead{display:flex;align-items:baseline;gap:13px;margin-bottom:8px}
   .snum{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--pine);
     border:1px solid var(--pine-line);background:var(--pine-bg);border-radius:6px;
     padding:2px 8px;flex:0 0 auto;letter-spacing:.02em}
-  .sdesc{color:var(--muted);margin:10px 0 26px;max-width:64ch;font-size:14.5px}
+  .sdesc{color:var(--muted);margin:10px 0 24px;max-width:70ch;font-size:14.5px}
+  .sdesc b{color:var(--ink-2)}
 
-  /* ---------- pipeline (E → D → C) ---------- */
+  /* mono spec chips */
+  .specrow{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 0}
+  .spec{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:7px;
+    background:var(--sunk);border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+  .spec .v{color:var(--pine-ink)}
+
+  /* pipeline */
   .pipe{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}
   .stage{position:relative;background:var(--paper);border:1px solid var(--line);
-    border-radius:14px;padding:18px 18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+    border-radius:14px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column}
   .stage::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:3px}
-  .stage.e::before{background:var(--indigo)}
-  .stage.d::before{background:var(--amber)}
-  .stage.c::before{background:var(--pine)}
-  .stage .tag{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.12em;
+  .stage.e::before{background:var(--indigo)} .stage.d::before{background:var(--amber)} .stage.c::before{background:var(--pine)}
+  .stage .tag{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.11em;
     text-transform:uppercase;margin:0 0 4px}
-  .stage.e .tag{color:var(--indigo)}
-  .stage.d .tag{color:var(--amber)}
-  .stage.c .tag{color:var(--pine)}
-  .stage h3{margin:0 0 4px;font-size:17px;font-weight:700;letter-spacing:-.01em}
-  .stage .role{font-size:13px;color:var(--muted);margin:0 0 14px;min-height:2.4em}
-  .stage .io{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.02em;
-    margin-bottom:6px;text-transform:uppercase}
-  .card{background:var(--sunk);border:1px solid var(--line);border-radius:10px;
-    padding:11px 12px;font-size:13px;margin-top:auto}
-  .card .lbl{font-family:var(--mono);font-size:10.5px;color:var(--faint);
-    text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:5px}
+  .stage.e .tag{color:var(--indigo)} .stage.d .tag{color:var(--amber)} .stage.c .tag{color:var(--pine)}
+  .stage h3{margin:0 0 4px;font-size:16.5px;font-weight:700;letter-spacing:-.01em}
+  .stage .role{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+  .stage ul.mini{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:6px}
+  .stage ul.mini li{font-size:12.5px;color:var(--ink-2);padding-left:15px;position:relative;line-height:1.5}
+  .stage ul.mini li::before{content:"›";position:absolute;left:0;color:var(--faint);font-weight:700}
+  .card{background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:auto}
+  .card .lbl{font-family:var(--mono);font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:5px}
   .triple{font-family:var(--mono);font-size:12.5px;line-height:1.9;word-break:break-word}
-  .triple .s{color:var(--ink);font-weight:600}
+  .triple .s,.triple .o{color:var(--ink);font-weight:600}
   .triple .r{color:var(--amber-ink);font-weight:700}
   .triple .rc{color:var(--pine-ink);font-weight:700}
-  .triple .o{color:var(--ink);font-weight:600}
   .triple .ty{color:var(--muted);font-weight:400}
-  .pipe .connect{display:none}
 
-  /* worked-example banner */
   .exline{background:var(--paper);border:1px dashed var(--line);border-left:3px solid var(--faint);
     border-radius:10px;padding:12px 15px;margin-bottom:22px;font-size:14px;color:var(--ink-2)}
-  .exline b{color:var(--ink);font-weight:600}
+  .exline b{color:var(--ink)}
   .exline .q{font-family:var(--mono);font-size:13px;background:var(--sunk);padding:1px 6px;border-radius:5px;border:1px solid var(--line)}
 
-  /* ---------- generic diagram grid ---------- */
+  /* generic boxes */
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .box{background:var(--paper);border:1px solid var(--line);border-radius:13px;
-    padding:18px;box-shadow:var(--shadow)}
-  .box h3{margin:0 0 3px;font-size:15.5px;font-weight:700}
-  .box .sub{font-size:12.5px;color:var(--muted);margin:0 0 13px}
+  .box{background:var(--paper);border:1px solid var(--line);border-radius:13px;padding:18px;box-shadow:var(--shadow)}
+  .box h3{margin:0 0 3px;font-size:15px;font-weight:700}
+  .box .sub{font-size:12.5px;color:var(--muted);margin:0 0 12px}
   .pillrow{display:flex;flex-wrap:wrap;gap:6px}
-  .pill{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;
-    border:1px solid var(--line);background:var(--sunk);color:var(--ink-2)}
+  .pill{font-family:var(--mono);font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;border:1px solid var(--line);background:var(--sunk);color:var(--ink-2)}
   .pill.b{background:var(--pine-bg);border-color:var(--pine-line);color:var(--pine-ink)}
   .pill.i{background:var(--indigo-bg);border-color:var(--indigo-line);color:var(--indigo-ink)}
-  .pill.a{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber-ink)}
-  .pill.r{background:var(--rose-bg);border-color:var(--rose-line);color:var(--rose)}
+  .pill.r{background:var(--rose-bg);border-color:var(--rose-line);color:var(--rose-ink)}
 
-  .layerlead{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;
-    text-transform:uppercase;margin:0 0 9px;display:flex;align-items:center;gap:8px}
-  .layerlead .n{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;
-    border-radius:6px;font-size:11px;color:var(--paper)}
+  .layerlead{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0 0 9px;display:flex;align-items:center;gap:8px}
+  .layerlead .n{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:6px;font-size:11px;color:var(--paper)}
   .n.n1{background:var(--pine)} .n.n2{background:var(--indigo)} .n.n3{background:var(--rose)}
 
-  /* ---------- gate flow ---------- */
-  .gate{display:flex;flex-direction:column;gap:0}
-  .gnode{display:flex;gap:13px;align-items:flex-start;position:relative;padding:0 0 4px}
-  .gnode .stem{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;padding-top:4px}
+  /* vertical logic flow (gate & sequences) */
+  .flow{display:flex;flex-direction:column}
+  .fnode{display:flex;gap:13px;align-items:flex-start;position:relative}
+  .stem{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;padding-top:4px}
   .dot{width:13px;height:13px;border-radius:50%;border:2.5px solid var(--pine);background:var(--paper);flex:0 0 auto}
   .dot.q{border-color:var(--amber);border-radius:3px}
   .dot.end{background:var(--pine);border-color:var(--pine)}
-  .dot.drop{border-color:var(--rose)}
+  .dot.io{border-color:var(--indigo)}
   .line{width:2px;flex:1;background:var(--line);min-height:14px}
-  .gbody{padding-bottom:16px;flex:1}
-  .gbody .t{font-size:14px;font-weight:600;margin:0}
-  .gbody .d{font-size:12.5px;color:var(--muted);margin:2px 0 0}
+  .fbody{padding-bottom:16px;flex:1;min-width:0}
+  .fbody .t{font-size:14px;font-weight:600;margin:0}
+  .fbody .d{font-size:12.5px;color:var(--muted);margin:3px 0 0}
+  .fbody .d code{font-size:.92em}
   .branch{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
   .brtag{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 9px;border-radius:7px;border:1px solid}
   .brtag.yes{color:var(--pine-ink);background:var(--pine-bg);border-color:var(--pine-line)}
-  .brtag.no{color:var(--rose);background:var(--rose-bg);border-color:var(--rose-line)}
+  .brtag.no{color:var(--rose-ink);background:var(--rose-bg);border-color:var(--rose-line)}
 
-  /* ---------- surfaces (3 clients → 1 core) ---------- */
-  .surfaces{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
-  .converge{text-align:center;color:var(--faint);font-size:22px;line-height:1;margin:2px 0 12px}
-  .corebar{background:var(--ink);color:var(--paper);border-radius:13px;padding:18px 20px;
-    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  /* callouts */
+  .note{border-radius:11px;padding:13px 16px;font-size:13.5px;margin-top:16px;border:1px solid}
+  .note.info{background:var(--pine-bg);border-color:var(--pine-line);color:var(--pine-ink)}
+  .note.warn{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber-ink)}
+  .note b{font-weight:700}
+
+  /* pseudo/code box */
+  .codebox{background:#0e1917;border:1px solid #1c2b27;border-radius:11px;padding:14px 16px;overflow-x:auto;margin-top:8px}
+  .codebox pre{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.75;color:#c8d6d1;white-space:pre}
+  .codebox .k{color:#6fd0c0} .codebox .c{color:#5f6f6a} .codebox .s{color:#e0a24e} .codebox .n{color:#8f9bd6}
+
+  /* two-column labeled table */
+  .kv{width:100%;border-collapse:collapse;font-size:13.5px}
+  .kv th,.kv td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:top}
+  .kv th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:600}
+  .kv td.k{font-family:var(--mono);font-size:12.5px;color:var(--pine-ink);white-space:nowrap;font-weight:600}
+  .kvwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--paper);box-shadow:var(--shadow)}
+
+  /* surfaces */
+  .surfaces{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:12px}
+  .converge{text-align:center;color:var(--faint);font-size:20px;line-height:1;margin:2px 0 12px}
+  .corebar{background:var(--ink);color:var(--paper);border-radius:13px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .corebar .k{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--pine)}
-  .corebar h3{margin:2px 0 0;font-size:18px;font-weight:720}
+  .corebar h3{margin:2px 0 0;font-size:17px;font-weight:720}
   .corebar .steps{display:flex;gap:8px;flex-wrap:wrap}
-  .cstep{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:8px;
-    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#dfe9e6}
+  .cstep{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#dfe9e6}
 
-  /* ---------- onprem ---------- */
+  /* onprem */
   .onprem{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}
   .stackcol{display:flex;flex-direction:column;gap:10px}
-  .svc{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:13px 15px;box-shadow:var(--shadow)}
-  .svc .n{font-weight:700;font-size:14px;margin:0}
-  .svc .p{font-family:var(--mono);font-size:11.5px;color:var(--pine-ink);margin:2px 0 0}
+  .svc{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:12px 15px;box-shadow:var(--shadow)}
+  .svc .n{font-weight:700;font-size:14px;margin:0} .svc .p{font-family:var(--mono);font-size:11.5px;color:var(--pine-ink);margin:2px 0 0}
   .svc .d{font-size:12px;color:var(--muted);margin:5px 0 0}
-  .bridge{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);
-    font-family:var(--mono);font-size:11px;text-align:center}
+  .bridge{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-family:var(--mono);font-size:11px;text-align:center}
   .bridge .barb{font-size:20px;color:var(--pine)}
-  .frame-label{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;
-    text-transform:uppercase;color:var(--faint);margin:0 0 10px}
-  .onprem-note{margin-top:16px;background:var(--pine-bg);border:1px solid var(--pine-line);
-    border-radius:11px;padding:13px 16px;font-size:13.5px;color:var(--pine-ink)}
-  .onprem-note b{font-weight:700}
+  .frame-label{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:0 0 10px}
 
-  /* ---------- data model ---------- */
+  /* data model */
   .models{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .tuple{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--mono);
-    font-size:13px;margin-top:10px}
+  .tuple{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-family:var(--mono);font-size:13px;margin-top:10px}
   .node{padding:7px 11px;border-radius:9px;font-weight:600;border:1px solid}
   .node.ent{background:var(--sunk);border-color:var(--line);color:var(--ink)}
   .node.rel{background:var(--pine-bg);border-color:var(--pine-line);color:var(--pine-ink)}
   .node .type{display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:1px}
-  .edge{color:var(--faint);font-size:16px}
+  .edge{color:var(--faint);font-size:15px}
 
-  footer{border-top:1px solid var(--line);padding:26px 0 60px;color:var(--muted);font-size:13px}
+  footer{border-top:1px solid var(--line);padding:24px 0 60px;color:var(--muted);font-size:13px}
   footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   footer a{color:var(--pine-ink)}
 
-  /* ---------- responsive ---------- */
-  @media (max-width:820px){
-    .pipe{grid-template-columns:1fr}
-    .grid2,.grid3,.models,.surfaces{grid-template-columns:1fr}
+  @media (max-width:840px){
+    .pipe,.grid2,.grid3,.models,.surfaces{grid-template-columns:1fr}
     .onprem{grid-template-columns:1fr}
     .bridge{flex-direction:row;justify-content:center}
     .bridge .barb{transform:rotate(90deg)}
-    .stage .role{min-height:0}
   }
 </style>
 </head>
@@ -227,18 +225,15 @@
 
 <header class="hero">
   <div class="wrap">
-    <p class="eyebrow">Extract · Define · Canonicalize</p>
-    <h1>社内文書から、<span class="hl">知識グラフ</span>を<br>自動でつくる仕組み</h1>
-    <p class="lead">不適合報告書・規程・技術文書などの非構造テキストを、LLMで「主語 → 関係 → 目的語」のトリプルに変換します。データは一切外部に出さず、すべて社内サーバー上で完結します。</p>
+    <p class="eyebrow">Extract · Define · Canonicalize — 実装ロジック解説</p>
+    <h1>社内文書から<span class="hl">知識グラフ</span>をつくる、その中身</h1>
+    <p class="lead">非構造テキストを「主語 → 関係 → 目的語」のトリプルに変換するパイプラインを、実際のコードのロジック（正規化の分岐・類似度ゲート・typed処理・反復改善・前段ルーター・堅牢化）まで踏み込んで図解します。データは一切外部に出さず、社内サーバーで完結します。</p>
     <div class="flow-strip" aria-label="全体の流れ">
-      <span class="chip doc">📄 文書</span>
-      <span class="arrow">→</span>
-      <span class="chip e">Extract 抽出</span>
-      <span class="arrow">→</span>
-      <span class="chip d">Define 定義</span>
-      <span class="arrow">→</span>
-      <span class="chip c">Canonicalize 正規化</span>
-      <span class="arrow">→</span>
+      <span class="chip">📄 文書 / PDF</span><span class="arrow">→</span>
+      <span class="chip">🧭 タイプ分類</span><span class="arrow">→</span>
+      <span class="chip e">Extract</span><span class="arrow">→</span>
+      <span class="chip d">Define</span><span class="arrow">→</span>
+      <span class="chip c">Canonicalize</span><span class="arrow">→</span>
       <span class="chip kg">🕸 知識グラフ</span>
     </div>
   </div>
@@ -246,23 +241,24 @@
 
 <main class="wrap">
 
-  <!-- 1. 中核パイプライン -->
+  <!-- 01 pipeline -->
   <section id="pipeline">
-    <div class="shead"><span class="snum">01</span><h2>中核：文書の1文が知識グラフになるまで</h2></div>
-    <p class="sdesc">EDC は3つのステージを順に通します。ここでは実際の不適合報告書の1文を追いかけ、各ステージで何が起きるかを見ます。</p>
+    <div class="shead"><span class="snum">01</span><h2>中核：1文が知識グラフになるまで（E→D→C）</h2></div>
+    <p class="sdesc">EDC 本体（<code>edc/edc_framework.py</code>）は3ステージを順に通します。各ステージは専用のプロンプトテンプレート＋Few-shot例でLLMを駆動。実際の不適合報告書の1文を追いかけます。</p>
 
-    <div class="exline">
-      <b>入力の1文：</b> <span class="q">溶接部の予熱不足が低温割れの原因となった。</span> — この文をパイプラインに流します。
-    </div>
+    <div class="exline"><b>入力の1文：</b> <span class="q">溶接部の予熱不足が低温割れの原因となった。</span></div>
 
     <div class="pipe">
       <div class="stage e">
-        <p class="tag">Stage 1 · Extract</p>
-        <h3>抽出（OIE）</h3>
-        <p class="role">文からエンティティと関係を、スキーマにとらわれず“素のまま”取り出す。</p>
-        <p class="io">出力：素のトリプル</p>
-        <div class="card">
-          <span class="lbl">raw triple</span>
+        <p class="tag">Stage 1 · Extract (OIE)</p>
+        <h3>抽出</h3>
+        <p class="role">スキーマにとらわれず“素の”トリプルを取り出す。<code>edc/extract.py</code></p>
+        <ul class="mini">
+          <li>プロンプト＋Few-shot例でLLMに抽出させる</li>
+          <li><code>parse_raw_triplets</code> が括弧対応で頑健にパース。3or5要素・空/<code>_</code>は除外</li>
+          <li>typed時は専用プロンプトで<b>5タプル</b>を直接出力</li>
+        </ul>
+        <div class="card"><span class="lbl">raw triple</span>
           <div class="triple"><span class="s">予熱不足</span> ―<span class="r">原因となった</span>→ <span class="o">低温割れ</span></div>
         </div>
       </div>
@@ -270,205 +266,341 @@
       <div class="stage d">
         <p class="tag">Stage 2 · Define</p>
         <h3>定義</h3>
-        <p class="role">抽出された関係が「何を意味するか」を LLM に一文で定義させる。</p>
-        <p class="io">出力：関係の定義文</p>
-        <div class="card">
-          <span class="lbl">definition</span>
-          <div class="triple"><span class="r">原因となった</span>：<span class="ty">主語が目的語を引き起こす／発生の原因となる関係。</span></div>
+        <p class="role">出現した各関係の意味を一文で定義。<code>edc/schema_definition.py</code></p>
+        <ul class="mini">
+          <li>1文中のユニークな関係を集約し、まとめて定義生成</li>
+          <li><code>parse_relation_definition</code> が <code>関係: 定義</code> 行を辞書化</li>
+          <li>この<b>定義文</b>が次段の埋め込み検索キーになる</li>
+        </ul>
+        <div class="card"><span class="lbl">definition</span>
+          <div class="triple"><span class="r">原因となった</span>：<span class="ty">主語が目的語を引き起こす関係。</span></div>
         </div>
       </div>
 
       <div class="stage c">
         <p class="tag">Stage 3 · Canonicalize</p>
         <h3>正規化</h3>
-        <p class="role">定義をもとに埋め込み検索＋LLM検証で、標準スキーマの関係へ寄せる。</p>
-        <p class="io">出力：確定トリプル</p>
-        <div class="card">
-          <span class="lbl">canonical triple</span>
+        <p class="role">定義をもとに標準スキーマの関係へ寄せる。<code>edc/schema_canonicalization.py</code></p>
+        <ul class="mini">
+          <li>定義文を埋め込み、<b>top-5</b>の近い既存関係を検索</li>
+          <li>LLMが選択肢から合致を選ぶ（or 該当なし）</li>
+          <li>該当なしでも<b>類似度ゲート</b>で統合／追加を判定（§04）</li>
+        </ul>
+        <div class="card"><span class="lbl">canonical triple</span>
           <div class="triple"><span class="s">予熱不足</span><span class="ty">:Cause</span> ―<span class="rc">CAUSES</span>→ <span class="o">低温割れ</span><span class="ty">:Defect</span></div>
         </div>
       </div>
     </div>
+    <div class="specrow">
+      <span class="spec">temperature=<span class="v">0</span>（決定的）</span>
+      <span class="spec">provider: <span class="v">vllm / azure / openai / local</span></span>
+      <span class="spec">stage毎に個別のprompt＋few-shot</span>
+    </div>
   </section>
 
-  <!-- 2. スキーマ3層 -->
-  <section id="schema">
-    <div class="shead"><span class="snum">02</span><h2>スキーマは3層で「増えすぎ」を防ぐ</h2></div>
-    <p class="sdesc">正規化の寄せ先となる関係の一覧（スキーマ）は3層構造。定型は固定し、それ以外だけを半自動で足すことで、関係が際限なく増えるのを抑えます。</p>
+  <!-- 02 canonicalize gate detail -->
+  <section id="gate">
+    <div class="shead"><span class="snum">02</span><h2>正規化の判断ロジック（詳細）：類似度マージゲート</h2></div>
+    <p class="sdesc">これが「初期スキーマに寄せる／近い既存に統合する／本当に新しいものだけ追加する」を自動で振り分ける中核です（<code>SchemaCanonicalizer.canonicalize</code>）。分岐は上から順に評価されます。</p>
 
+    <div class="box">
+      <div class="flow">
+        <div class="fnode">
+          <div class="stem"><span class="dot io"></span><span class="line"></span></div>
+          <div class="fbody"><p class="t">生の関係が入力される　例：<code>原因となった</code></p></div>
+        </div>
+        <div class="fnode">
+          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
+          <div class="fbody">
+            <p class="t">① すでに確定スキーマに存在する関係名？</p>
+            <p class="d"><code>open_relation in schema_dict</code> の単純一致チェック</p>
+            <div class="branch"><span class="brtag yes">Yes → そのまま採用（LLM呼ばない）</span><span class="brtag no">No → ②へ</span></div>
+          </div>
+        </div>
+        <div class="fnode">
+          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
+          <div class="fbody">
+            <p class="t">② スキーマが空 or 定義が無い？</p>
+            <p class="d">スキーマフリー（初期スキーマ未指定）や、Defineが定義を出せなかった関係は検証をスキップし ⑤ へ</p>
+            <div class="branch"><span class="brtag no">該当 → 候補なしで ⑤ へ</span><span class="brtag yes">それ以外 → ③へ</span></div>
+          </div>
+        </div>
+        <div class="fnode">
+          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
+          <div class="fbody">
+            <p class="t">③ 埋め込み top-5 検索 ＋ LLM検証</p>
+            <p class="d"><code>retrieve_similar_relations</code>：関係名でなく<b>定義文</b>を正規化コサイン類似度で比較し上位5件を取得。LLMには <code>A. B. C. …</code> ＋ <code>None of the above</code> の選択肢を提示し、1文字で回答させる（<code>llm_verify</code>）</p>
+            <div class="branch"><span class="brtag yes">合致を選択 → 既存関係へマッピング</span><span class="brtag no">None of the above → ④へ</span></div>
+          </div>
+        </div>
+        <div class="fnode">
+          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
+          <div class="fbody">
+            <p class="t">④ 最近傍との類似度 cos ≥ τ ？</p>
+            <p class="d">LLMが「該当なし」でも、最近傍(<code>scores[0]</code>)が閾値以上なら“言い換えレベル”とみなし統合。近傍同義を吸収してスキーマ肥大を抑える</p>
+            <div class="branch"><span class="brtag yes">Yes → 最近傍へ統合</span><span class="brtag no">No → ⑤へ</span></div>
+          </div>
+        </div>
+        <div class="fnode">
+          <div class="stem"><span class="dot end"></span><span class="line" style="background:transparent"></span></div>
+          <div class="fbody">
+            <p class="t">⑤ enrich（漏れ追加）モード？</p>
+            <p class="d">本当に新しい概念だけをここで追加。追加時は定義を<b>その場で埋め込み、以降のマッチ対象に動的登録</b>するため、同一文書内の後続トリプルが新関係にマッチできる</p>
+            <div class="branch"><span class="brtag yes">enrich=ON → 新規スキーマとして追加</span><span class="brtag no">OFF → 除外（トリプルを捨てる）</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="specrow">
+      <span class="spec">τ = <span class="v">CANON_MERGE_THRESHOLD</span>（既定 0.9）</span>
+      <span class="spec">top_k = <span class="v">5</span></span>
+      <span class="spec">埋め込み対象 = <span class="v">関係の定義文</span></span>
+      <span class="spec">類似度 = 正規化コサイン</span>
+    </div>
+    <p class="note info"><b>効果：</b>フリー発見で <b>95種</b> に膨らんだ関係が、ドメイン初期スキーマ＋このゲートで <b>24種</b> に収束（実測）。「初期を与えて漏れは追加、ただし際限なく増やさない」を実現します。</p>
+  </section>
+
+  <!-- 03 typed mode -->
+  <section id="typed">
+    <div class="shead"><span class="snum">03</span><h2>Typed モードの内部処理（5タプル化と型正規化）</h2></div>
+    <p class="sdesc">エンティティに型を付ける typed モードは、<code>target_types_path</code> 指定か <code>enrich_types</code> で有効化。ここが最もトリッキーで、<b>5タプルを一旦3タプルへ縮約→SD/SC→型を再付与→型を正規化</b>という順で処理します（SD/SCは3タプル前提のため）。</p>
+
+    <div class="box">
+      <div class="flow">
+        <div class="fnode"><div class="stem"><span class="dot io"></span><span class="line"></span></div>
+          <div class="fbody"><p class="t">1. Typed OIE が5タプルを出力</p>
+            <p class="d"><code>[予熱不足, Cause, 原因となった, 低温割れ, Defect]</code></p></div></div>
+        <div class="fnode"><div class="stem"><span class="dot"></span><span class="line"></span></div>
+          <div class="fbody"><p class="t">2. 3タプルへ縮約（型はサイドカー退避）</p>
+            <p class="d"><code>[t[0], t[2], t[3]]</code> で <code>[予熱不足, 原因となった, 低温割れ]</code>。元の5タプルは <code>typed_oie_list</code> に保持</p></div></div>
+        <div class="fnode"><div class="stem"><span class="dot"></span><span class="line"></span></div>
+          <div class="fbody"><p class="t">3. Define → Schema Canonicalization（関係の正規化）</p>
+            <p class="d">§02 のゲートで <code>原因となった → CAUSES</code></p></div></div>
+        <div class="fnode"><div class="stem"><span class="dot"></span><span class="line"></span></div>
+          <div class="fbody"><p class="t">4. 型を位置合わせで再付与</p>
+            <p class="d">SC後の3タプルに、退避した <code>subj_type / obj_type</code> を index で戻し5タプルへ復元</p></div></div>
+        <div class="fnode"><div class="stem"><span class="dot end"></span><span class="line" style="background:transparent"></span></div>
+          <div class="fbody"><p class="t">5. Type Canonicalization（型の正規化）</p>
+            <p class="d"><code>TypeCanonicalizer</code> は §02 と<b>対称なゲート</b>で <code>Cause / Defect</code> を確定型へ寄せる。<code>(entity, raw_type)</code> を<b>キャッシュ</b>して重複LLM呼び出しを削減。確定できない型は <code>"Other"</code></p></div></div>
+      </div>
+    </div>
+    <div class="specrow">
+      <span class="spec">型ゲートも τ・top_k=5 で対称</span>
+      <span class="spec">キャッシュ: <span class="v">(entity, raw_type) → type</span></span>
+      <span class="spec">未確定 → <span class="v">"Other"</span></span>
+      <span class="spec">untyped時は3タプルを素通し</span>
+    </div>
+  </section>
+
+  <!-- 04 refinement -->
+  <section id="refine">
+    <div class="shead"><span class="snum">04</span><h2>反復改善（Refinement）：ヒント付き再抽出</h2></div>
+    <p class="sdesc"><code>--refinement_iterations N</code> を付けると、1回目の結果を手がかりに N 回まで再抽出します。表面的に取り逃した関係を拾う仕組み。<b>CLI/EDC本体のみで、API(one-shot)では未使用。</b></p>
+
+    <div class="grid2">
+      <div class="box">
+        <h3>ヒントの組み立て</h3>
+        <p class="sub"><code>construct_refinement_hint</code></p>
+        <div class="flow">
+          <div class="fnode"><div class="stem"><span class="dot io"></span><span class="line"></span></div>
+            <div class="fbody"><p class="t">前回のトリプルからエンティティ／関係を収集</p></div></div>
+          <div class="fnode"><div class="stem"><span class="dot"></span><span class="line"></span></div>
+            <div class="fbody"><p class="t">EntityExtractor で候補エンティティ抽出</p>
+              <p class="d">前回分と <code>merge_entities</code> で統合 → entity hint</p></div></div>
+          <div class="fnode"><div class="stem"><span class="dot"></span><span class="line"></span></div>
+            <div class="fbody"><p class="t">SchemaRetriever で関連関係を検索</p>
+              <p class="d">入力文を埋め込み、スキーマから <b>top-10</b> の関連関係を取得。例文付きで relation hint 化</p></div></div>
+          <div class="fnode"><div class="stem"><span class="dot end"></span><span class="line" style="background:transparent"></span></div>
+            <div class="fbody"><p class="t">refined OIE を entity/relation hint 付きで再実行</p>
+              <p class="d">専用テンプレート <code>oie_r_template</code></p></div></div>
+        </div>
+      </div>
+      <div class="box">
+        <h3>反復ループ全体</h3>
+        <p class="sub"><code>extract_kg</code> の <code>for iteration in range(N+1)</code></p>
+        <ul class="mini" style="color:var(--ink-2)">
+          <li>各 iteration で OIE → Define → Canonicalize を実行</li>
+          <li>結果を次イテレーションの hint として渡す</li>
+          <li>反復ごとに <code>iter{i}/</code> ディレクトリへ中間結果を出力</li>
+          <li>不要になったモデルは <code>free_model</code> でGPU解放（local時）</li>
+        </ul>
+        <div class="note info" style="margin-top:6px"><b>別embedder：</b>Retriever は SC とは別の <code>sr_embedder</code> を使い、専用の指示プロンプトで文→関係を検索します。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 router -->
+  <section id="router">
+    <div class="shead"><span class="snum">05</span><h2>前段ルーター：文書タイプ分類 → 標準スキーマ合成</h2></div>
+    <p class="sdesc"><code>--doctype auto</code> 時、EDC本体を呼ぶ前に文書を分類し、該当タイプの標準スキーマを自動適用します（<code>doctype_router.py</code>）。LLMの役割は<b>分類のみ</b>で、スキーマ設計はさせません（事前固定）。</p>
+
+    <div class="grid2">
+      <div class="box">
+        <h3>1. 分類（classify_document）</h3>
+        <p class="sub">registry のタイプ一覧＋サンプルをLLMに提示</p>
+        <div class="codebox"><pre><span class="c"># temperature=0, JSONのみ出力を要求</span>
+{ <span class="k">"type"</span>: <span class="s">"NCR_不適合報告書"</span>,
+  <span class="k">"confidence"</span>: <span class="n">1.0</span>,
+  <span class="k">"reason"</span>: <span class="s">"是正処置・原因記載あり"</span> }</pre></div>
+        <p class="d" style="font-size:12.5px;color:var(--muted);margin-top:10px"><code>_parse_json_obj</code> がコードフェンス除去・最初の <code>{…}</code> 抽出で頑健にパース。失敗や該当なしは <code>UNKNOWN</code>。</p>
+      </div>
+      <div class="box">
+        <h3>2. スキーマ合成（compose_target）</h3>
+        <p class="sub">不変骨格 ∪ ドメイン層 を一時CSVへ</p>
+        <div class="flow">
+          <div class="fnode"><div class="stem"><span class="dot io"></span><span class="line"></span></div>
+            <div class="fbody"><p class="t">registry から骨格CSVとドメインCSVを読む</p></div></div>
+          <div class="fnode"><div class="stem"><span class="dot"></span><span class="line"></span></div>
+            <div class="fbody"><p class="t">辞書マージ（同名は<b>ドメイン優先で上書き</b>）</p>
+              <p class="d">relation用とtype用の両方を合成</p></div></div>
+          <div class="fnode"><div class="stem"><span class="dot end"></span><span class="line" style="background:transparent"></span></div>
+            <div class="fbody"><p class="t">一時CSVを書き出し、そのパスをEDC設定へ</p>
+              <p class="d"><code>target_schema_path</code> / <code>target_types_path</code> ＋ <code>enrich=ON</code></p></div></div>
+        </div>
+      </div>
+    </div>
+    <p class="note warn"><b>UNKNOWN のとき：</b><code>compose_target</code> は <code>(None, None)</code> を返し、従来設定（<code>--target_schema_path</code> 指定 or フリー発見＋HITL）にフォールバックします。</p>
+  </section>
+
+  <!-- 06 HITL -->
+  <section id="hitl">
+    <div class="shead"><span class="snum">06</span><h2>HITL：抽出と正規化を分け、間に人手レビュー</h2></div>
+    <p class="sdesc">Streamlit UI（<code>app.py</code>）は EDC を2フェーズに分割し、発見スキーマを人がキュレーションできます。</p>
+
+    <div class="grid2">
+      <div class="box">
+        <h3>Phase A — extract_and_define()</h3>
+        <p class="sub">OIE + Define のみ（ファイル出力なし）</p>
+        <ul class="mini" style="color:var(--ink-2)">
+          <li>発見スキーマを構築：<b>定義は最長のものを採用</b>、<b>count はOIE出現回数</b></li>
+          <li>typed時は発見型リストも同様に構築（初期型定義をシード）</li>
+          <li><code>st.data_editor</code> で人にスキーマ提示 → 統合/リネーム/定義修正/採用・削除</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h3>Phase B — canonicalize_with_schema()</h3>
+        <p class="sub">人が確定したスキーマで再正規化</p>
+        <ul class="mini" style="color:var(--ink-2)">
+          <li><code>self.schema = curated_schema</code> を設定して SC 実行</li>
+          <li>SchemaCanonicalizer は毎回 <b>self.schema を再embedding</b> → 確定スキーマへマッピング</li>
+          <li>typed時は型の再付与＋Type正規化も対称に実行</li>
+          <li>enrich_types で「初期型＋漏れ追加」も選べる</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 schema 3-layer -->
+  <section id="schema">
+    <div class="shead"><span class="snum">07</span><h2>スキーマ3層で「増えすぎ」を防ぐ</h2></div>
+    <p class="sdesc">正規化の寄せ先スキーマは3層構造。定型を固定し、それ以外だけを半自動で足す設計。レジストリ(<code>schemas/registry.json</code>)が「タイプ→ドメインCSV」を保持します。</p>
     <div class="grid3">
       <div class="box">
         <p class="layerlead"><span class="n n1">1</span>不変骨格</p>
         <h3>全文書で共通・手で固定</h3>
-        <p class="sub">文書タイプに依存しない土台。必ず含める関係の閉集合。</p>
-        <div class="pillrow">
-          <span class="pill b">DEFINES</span><span class="pill b">MENTIONS</span>
-          <span class="pill b">REFERS_TO</span><span class="pill b">IS_A</span><span class="pill b">PART_OF</span>
-        </div>
+        <p class="sub">タイプに依存しない土台。必ず含む関係の閉集合。</p>
+        <div class="pillrow"><span class="pill b">DEFINES</span><span class="pill b">MENTIONS</span><span class="pill b">REFERS_TO</span><span class="pill b">IS_A</span><span class="pill b">PART_OF</span></div>
       </div>
       <div class="box">
         <p class="layerlead"><span class="n n2">2</span>ドメイン層</p>
         <h3>文書タイプ別・昇格制</h3>
-        <p class="sub">NCR・規程・論文など、タイプ固有の関係。新タイプ登場時だけ追加。</p>
-        <div class="pillrow">
-          <span class="pill i">CAUSES</span><span class="pill i">MITIGATES</span>
-          <span class="pill i">APPLIES_TO</span><span class="pill i">REQUIRES_APPROVAL_FROM</span><span class="pill i">DEPENDS_ON</span>
-        </div>
+        <p class="sub">NCR・規程・論文などタイプ固有。新タイプ時だけ追加。</p>
+        <div class="pillrow"><span class="pill i">CAUSES</span><span class="pill i">MITIGATES</span><span class="pill i">APPLIES_TO</span><span class="pill i">REQUIRES_APPROVAL_FROM</span><span class="pill i">DEPENDS_ON</span></div>
       </div>
       <div class="box">
         <p class="layerlead"><span class="n n3">3</span>連結層</p>
         <h3>名寄せ・エッジにしない</h3>
-        <p class="sub">同一・別名はエッジではなくノード統合で処理（1実体=1ノード）。</p>
-        <div class="pillrow">
-          <span class="pill r">SAME_AS → マージ</span><span class="pill r">ALIAS_OF → 別名属性</span>
-        </div>
+        <p class="sub">同一・別名はノード統合で処理（1実体=1ノード）。</p>
+        <div class="pillrow"><span class="pill r">SAME_AS → マージ</span><span class="pill r">ALIAS_OF → 別名属性</span></div>
       </div>
     </div>
-    <p class="sdesc" style="margin-top:16px">前段のルーターが文書タイプを判定し、<b>「不変骨格 ∪ そのタイプのドメイン層」</b>を合成して正規化の寄せ先に渡します。</p>
   </section>
 
-  <!-- 3. マージゲート -->
-  <section id="gate">
-    <div class="shead"><span class="snum">03</span><h2>正規化の判断ロジック：類似度マージゲート</h2></div>
-    <p class="sdesc">抽出された関係を1つずつ、この分岐にかけます。「初期スキーマに寄せる／近い既存に統合する／本当に新しいものだけ追加する」を自動で振り分け、スキーマの肥大化を防ぐ中核です。</p>
-
-    <div class="box">
-      <div class="gate">
-        <div class="gnode">
-          <div class="stem"><span class="dot"></span><span class="line"></span></div>
-          <div class="gbody"><p class="t">生の関係／型が入力される</p><p class="d">例：<code>原因となった</code></p></div>
-        </div>
-        <div class="gnode">
-          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
-          <div class="gbody">
-            <p class="t">確定スキーマに既にある？</p>
-            <div class="branch"><span class="brtag yes">Yes → そのまま採用</span><span class="brtag no">No → 次へ</span></div>
-          </div>
-        </div>
-        <div class="gnode">
-          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
-          <div class="gbody">
-            <p class="t">埋め込み top-k 検索 ＋ LLM が候補から合致を選ぶ？</p>
-            <p class="d">意味の近い既存の関係を探し、LLMが「これと同じか」を検証</p>
-            <div class="branch"><span class="brtag yes">Yes → 既存へマッピング</span><span class="brtag no">No → 次へ</span></div>
-          </div>
-        </div>
-        <div class="gnode">
-          <div class="stem"><span class="dot q"></span><span class="line"></span></div>
-          <div class="gbody">
-            <p class="t">最近傍との類似度 cos ≥ τ（既定 0.9）？</p>
-            <p class="d">閾値以上なら「言い換えレベルに近い」とみなす</p>
-            <div class="branch"><span class="brtag yes">Yes → 最近傍へ統合（近傍同義を吸収）</span><span class="brtag no">No → 次へ</span></div>
-          </div>
-        </div>
-        <div class="gnode">
-          <div class="stem"><span class="dot end"></span><span class="line" style="background:transparent"></span></div>
-          <div class="gbody">
-            <p class="t">本当に新しい概念だけを判定</p>
-            <div class="branch"><span class="brtag yes">enrich オン → 新規スキーマとして追加</span><span class="brtag no">オフ → 除外 / Other</span></div>
-          </div>
-        </div>
-      </div>
+  <!-- 08 robustness / providers -->
+  <section id="robust">
+    <div class="shead"><span class="snum">08</span><h2>プロバイダ抽象と堅牢化</h2></div>
+    <p class="sdesc"><code>edc/utils/llm_utils.py</code> がLLM/埋め込みの差異を吸収。同じコードで vLLM・Azure・OpenAI・ローカルHFを切り替えます。</p>
+    <div class="kvwrap">
+      <table class="kv">
+        <thead><tr><th>仕組み</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td class="k">provider抽象</td><td><code>is_model_openai/azure/vllm</code> で判定。埋め込みは <code>SentenceTransformer / AzureEmbedder / VllmEmbedder</code> を <code>.encode()</code> 互換で統一</td></tr>
+          <tr><td class="k">リトライ上限</td><td>API失敗時は5秒待って再試行。<code>VLLM_MAX_RETRIES</code>（既定5）で打ち切り → エンドポイント停止時も<b>無限ハングしない</b></td></tr>
+          <tr><td class="k">タイムアウト</td><td>クライアントに <code>VLLM_TIMEOUT</code>（既定300秒）を設定</td></tr>
+          <tr><td class="k">決定性</td><td>全LLM呼び出しが <code>temperature=0</code></td></tr>
+          <tr><td class="k">頑健パース</td><td>括弧対応でトリプルを抽出、型不整合や空要素を除外。JSON抽出もフェンス除去付き</td></tr>
+          <tr><td class="k">遅延ロード</td><td>transformers/SentenceTransformer はローカルモデル時のみ import（APIコンテナは torch 不要で軽量）</td></tr>
+        </tbody>
+      </table>
     </div>
-    <p class="sdesc" style="margin-top:16px">実測では、フリー発見で <b>95 種</b> に膨らんだ関係が、ドメイン初期スキーマ＋このゲートで <b>24 種</b> に収束しました。</p>
   </section>
 
-  <!-- 4. 3つの使い方 -->
+  <!-- 09 surfaces + onprem -->
   <section id="surfaces">
-    <div class="shead"><span class="snum">04</span><h2>3つの入り口が、同じコアを共有</h2></div>
-    <p class="sdesc">バッチ処理・人手レビュー・外部連携の3つの使い方があり、いずれも同じ EDC コア（E→D→C）を呼びます。</p>
+    <div class="shead"><span class="snum">09</span><h2>3つの入り口 × 完全オンプレ</h2></div>
+    <p class="sdesc">CLIバッチ・人手レビュー・HTTP APIが同じ EDC コアを共有。重い推論（LLM/埋め込み/OCR）は社内 DGX Spark に HTTP 委譲し、外部送信はゼロです。</p>
 
     <div class="surfaces">
-      <div class="box">
-        <h3>run.py</h3>
-        <p class="sub">CLI バッチ</p>
-        <p style="font-size:13px;color:var(--ink-2);margin:0">フォルダ内の .txt/.pdf/.md をまとめて処理し、triplets.json を書き出す。</p>
-      </div>
-      <div class="box">
-        <h3>app.py</h3>
-        <p class="sub">Streamlit（HITL）</p>
-        <p style="font-size:13px;color:var(--ink-2);margin:0">抽出→<b>人がスキーマをレビュー・修正</b>→正規化。精度を人手で高める2フェーズ運用。</p>
-      </div>
-      <div class="box">
-        <h3>api.py</h3>
-        <p class="sub">FastAPI（:8080）</p>
-        <p style="font-size:13px;color:var(--ink-2);margin:0">Dify や他 RAG アプリから <code>POST /extract</code> で呼べる HTTP API。</p>
-      </div>
+      <div class="box"><h3>run.py</h3><p class="sub">CLI バッチ</p><p style="font-size:12.5px;color:var(--ink-2);margin:0">フォルダ内の .txt/.pdf/.md を一括処理し JSON/CSV 出力。</p></div>
+      <div class="box"><h3>app.py</h3><p class="sub">Streamlit（HITL）</p><p style="font-size:12.5px;color:var(--ink-2);margin:0">抽出→人がスキーマ確定→正規化の2フェーズ。</p></div>
+      <div class="box"><h3>api.py</h3><p class="sub">FastAPI（:8080）</p><p style="font-size:12.5px;color:var(--ink-2);margin:0">Dify等から <code>POST /extract</code>。one-shot。</p></div>
     </div>
-    <div class="converge">▼</div>
+    <div class="converge">▼ 同一コア</div>
     <div class="corebar">
-      <div>
-        <p class="k">shared core · edc/</p>
-        <h3>EDC 本体</h3>
-      </div>
-      <div class="steps">
-        <span class="cstep">Extract</span>
-        <span class="cstep">Define</span>
-        <span class="cstep">Canonicalize</span>
-        <span class="cstep">Type Canon.</span>
-      </div>
+      <div><p class="k">shared core · edc/</p><h3>EDC 本体</h3></div>
+      <div class="steps"><span class="cstep">Extract</span><span class="cstep">Define</span><span class="cstep">Canonicalize</span><span class="cstep">Type Canon.</span></div>
     </div>
-  </section>
 
-  <!-- 5. 完全オンプレ -->
-  <section id="onprem">
-    <div class="shead"><span class="snum">05</span><h2>完全オンプレ：データは社内から出ない</h2></div>
-    <p class="sdesc">アプリ層は軽量で、LLM・埋め込み・OCR という重い処理は社内 DGX Spark に HTTP で委譲します。外部サービスへの送信はゼロです。</p>
-
-    <div class="onprem">
+    <div class="onprem" style="margin-top:22px">
       <div>
         <p class="frame-label">アプリ層（軽量コンテナ）</p>
         <div class="stackcol">
-          <div class="svc"><p class="n">api.py / run.py / app.py</p><p class="d">EDC コア＋文書タイプ・ルーター。torch 不要のスリム構成。</p></div>
-          <div class="svc"><p class="n">pdf_processor.py</p><p class="d">PDF はOCRへ、txt/md はチャンク分割。</p></div>
+          <div class="svc"><p class="n">api.py / run.py / app.py + edc/</p><p class="d">EDCコア＋ルーター。torch不要のスリム構成。</p></div>
+          <div class="svc"><p class="n">pdf_processor.py</p><p class="d">PDF→OCR、txt/md→チャンク分割(line/heading/recursive)。</p></div>
         </div>
       </div>
-      <div class="bridge">
-        <span class="barb">→</span>
-        <span>LAN 内<br>HTTP のみ</span>
-      </div>
+      <div class="bridge"><span class="barb">→</span><span>LAN内<br>HTTPのみ</span></div>
       <div>
         <p class="frame-label">DGX Spark（社内・完全ローカル）</p>
         <div class="stackcol">
-          <div class="svc"><p class="n">vLLM · Chat LLM</p><p class="p">:8000</p><p class="d">抽出・定義・正規化検証を担う LLM。</p></div>
-          <div class="svc"><p class="n">vLLM · Embedding</p><p class="p">:8003</p><p class="d">関係・型の類似度検索用の埋め込み。</p></div>
-          <div class="svc"><p class="n">PaddleX · OCR</p><p class="p">:8005</p><p class="d">PDF をページ単位でテキスト化。</p></div>
+          <div class="svc"><p class="n">vLLM · Chat LLM</p><p class="p">:8000</p><p class="d">抽出・定義・正規化検証・分類。</p></div>
+          <div class="svc"><p class="n">vLLM · Embedding</p><p class="p">:8003</p><p class="d">関係・型の類似度検索用。</p></div>
+          <div class="svc"><p class="n">PaddleX · OCR</p><p class="p">:8005</p><p class="d">PDFをページ単位でテキスト化。</p></div>
         </div>
       </div>
     </div>
-    <p class="onprem-note"><b>ポイント：</b>アプリ層は「頭脳」を持たず、すべての推論を社内サーバーへ委譲する薄い殻。だからコンテナは軽く、機密文書も社外に一切出ません。</p>
+    <p class="note info"><b>ポイント：</b>アプリ層は「頭脳」を持たない薄い殻で、すべての推論を社内サーバーへ委譲。機密文書は社外に一切出ません。</p>
   </section>
 
-  <!-- 6. データモデル -->
-  <section id="model">
-    <div class="shead"><span class="snum">06</span><h2>出てくるもの：2種類のトリプル</h2></div>
-    <p class="sdesc">最終成果は知識グラフのトリプル。既定は3タプル、typed モードでは型付きの5タプルになります。</p>
+  <!-- 10 data & outputs -->
+  <section id="output">
+    <div class="shead"><span class="snum">10</span><h2>出力：トリプルと中間成果物</h2></div>
+    <p class="sdesc">最終成果は知識グラフのトリプル。既定は3タプル、typed モードでは型付き5タプル。各ステージの中間結果もイテレーション毎に保存されます。</p>
 
     <div class="models">
       <div class="box">
         <h3>3タプル<span style="color:var(--muted);font-weight:400;font-size:13px"> ・ untyped（既定）</span></h3>
-        <p class="sub">主語 → 関係 → 目的語</p>
-        <div class="tuple">
-          <span class="node ent">予熱不足</span>
-          <span class="edge">―</span>
-          <span class="node rel">CAUSES</span>
-          <span class="edge">→</span>
-          <span class="node ent">低温割れ</span>
-        </div>
+        <div class="tuple"><span class="node ent">予熱不足</span><span class="edge">―</span><span class="node rel">CAUSES</span><span class="edge">→</span><span class="node ent">低温割れ</span></div>
       </div>
       <div class="box">
-        <h3>5タプル<span style="color:var(--muted);font-weight:400;font-size:13px"> ・ typed モード</span></h3>
-        <p class="sub">エンティティに型が付き、型も正規化される</p>
-        <div class="tuple">
-          <span class="node ent">予熱不足<span class="type">Cause</span></span>
-          <span class="edge">―</span>
-          <span class="node rel">CAUSES</span>
-          <span class="edge">→</span>
-          <span class="node ent">低温割れ<span class="type">Defect</span></span>
-        </div>
+        <h3>5タプル<span style="color:var(--muted);font-weight:400;font-size:13px"> ・ typed</span></h3>
+        <div class="tuple"><span class="node ent">予熱不足<span class="type">Cause</span></span><span class="edge">―</span><span class="node rel">CAUSES</span><span class="edge">→</span><span class="node ent">低温割れ<span class="type">Defect</span></span></div>
       </div>
     </div>
-    <p class="sdesc" style="margin-top:16px">出力は <code>triplets.json</code>（ファイル別トリプル）と <code>discovered_schema.csv</code>（発見した関係と件数）。API では JSON で返ります。</p>
+
+    <div class="kvwrap" style="margin-top:16px">
+      <table class="kv">
+        <thead><tr><th>ファイル</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td class="k">iter{i}/result_at_each_stage.json</td><td>入力文・hint・OIE・定義・正規化候補・正規化結果を<b>ステージ別に全記録</b>（デバッグ/監査用）</td></tr>
+          <tr><td class="k">iter{i}/canon_kg.txt</td><td>正規化済みトリプル（1行1テキスト分）</td></tr>
+          <tr><td class="k">triplets.json</td><td>ファイル別にグループ化した最終トリプル（run.py）</td></tr>
+          <tr><td class="k">discovered_schema.csv</td><td>発見関係・定義・出現件数（count降順）</td></tr>
+          <tr><td class="k">discovered_types.csv</td><td>typed時のみ。発見型・定義・件数</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note info"><b>API レスポンス：</b><code>POST /extract</code> は <code>{doctype, classification, schema_, types, n_triplets, triplets[]}</code> の JSON を返します。</p>
   </section>
 
 </main>
@@ -476,7 +608,7 @@
 <footer>
   <div class="wrap">
     <span>EDC — Extract, Define, Canonicalize ／ 完全オンプレ ナレッジグラフ構築</span>
-    <span>詳細な設計は <a href="./DESIGN.md">DESIGN.md</a> / <a href="./DESIGN.html">DESIGN.html</a> を参照</span>
+    <span>設計の全体像は <a href="./DESIGN.md">DESIGN.md</a> / <a href="./DESIGN.html">DESIGN.html</a></span>
   </div>
 </footer>
 
