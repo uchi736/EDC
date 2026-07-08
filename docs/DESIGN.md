@@ -69,24 +69,37 @@ flowchart LR
 **連結層(名寄せ)** の3部構成。
 
 ```mermaid
-flowchart TD
-  Doc["文書 (txt / md / pdf)"] --> IsPdf{"PDF?"}
-  IsPdf -- "yes" --> OCR["PaddleX OCR<br/>(pdf_processor)"]
-  IsPdf -- "no" --> Chunk
-  OCR --> Chunk["チャンク分割<br/>(line / heading / recursive)"]
+sequenceDiagram
+  autonumber
+  participant Cl as クライアント
+  participant PDF as pdf_processor
+  participant OCR as PaddleX :8005
+  participant R as doctype_router (前段)
+  participant E as EDC 本体 (E→D→C)
+  participant LLM as vLLM gemma :8000
+  participant EMB as ruri :8003
 
-  Chunk --> Route["前段: 文書タイプ分類<br/>(doctype_router.classify)"]
-  Route --> Sel["標準スキーマ選択<br/>不変骨格 ∪ ドメイン層"]
+  Cl->>PDF: 文書投入 (pdf)
+  PDF->>OCR: POST /ocr
+  OCR-->>PDF: ページ毎テキスト
+  Note over Cl,PDF: txt/md はOCR不要 → チャンク分割(line/heading/recursive)
 
-  subgraph EDC["EDC 本体 (無改変)"]
-    Sel --> OIE["Extract (OIE)<br/>生トリプル抽出"]
-    OIE --> SD["Define<br/>関係の定義生成"]
-    SD --> SC["Canonicalize<br/>関係の正規化 + 類似度マージゲート"]
-    SC --> TC["Type Canonicalization<br/>(typedモード時) 型の正規化"]
-  end
+  Cl->>R: サンプルで文書タイプ分類
+  R->>LLM: chat (分類)
+  LLM-->>R: doctype
+  R-->>E: 標準スキーマ(不変骨格 ∪ ドメイン層) を適用
 
-  TC --> Link["連結層: 名寄せ<br/>SAME_AS=マージ / ALIAS_OF=属性"]
-  Link --> KG[("知識グラフ<br/>triplets + schema + types")]
+  E->>LLM: Extract(OIE) 生トリプル抽出
+  LLM-->>E: 生トリプル
+  E->>LLM: Define 関係の定義生成
+  LLM-->>E: 定義
+  E->>EMB: Canonicalize 関係の埋め込み検索(top-k)
+  EMB-->>E: 類似候補
+  E->>LLM: 正規化検証 + 類似度マージゲート(τ)
+  LLM-->>E: 確定関係
+  Note over E: typedモード時は型も同様に正規化(Type Canonicalization)
+
+  E-->>Cl: 知識グラフ (triplets + schema + types)
 ```
 
 各ステージの実装：
