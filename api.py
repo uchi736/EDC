@@ -15,6 +15,8 @@ E→D→C本体・run.py・app.py は無改変。
     POST /classify      文書タイプ分類のみ
     POST /extract       テキスト→KG抽出（doctypeで標準スキーマ自動適用）
     POST /extract_file  ファイル(.txt/.md/.pdf)アップロード→KG抽出
+    POST /convert       PDF→ページ毎テキスト変換のみ（PaddleX OCR。抽出なし。
+                        llm-graph-builder のスキャンPDF前処理用）
 """
 
 import os
@@ -281,3 +283,27 @@ async def extract_file(file: UploadFile = File(...), doctype: str = Form("auto")
     return _to_response(extract_kg(
         file_bytes=data, filename=file.filename, doctype=doctype, chunk_method=chunk_method,
     ))
+
+
+class ConvertResponse(BaseModel):
+    filename: Optional[str] = None
+    n_pages: int = 0
+    pages: List[str] = []
+
+
+@app.post("/convert", response_model=ConvertResponse)
+async def convert(file: UploadFile = File(...)):
+    """PDF→ページ毎テキスト変換のみ（KG抽出なし）。
+
+    バックエンドは env（PDF_PROCESSOR/PDF_BACKEND）に従う: 既定は PaddleX PP-OCRv5。
+    スキャンPDFのOCRを他アプリ（llm-graph-builder等）から使うための薄い口。
+    """
+    import pdf_processor
+    data = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(data); tmp_path = tmp.name
+    try:
+        pages = pdf_processor.extract_text_from_pdf(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+    return {"filename": file.filename, "n_pages": len(pages), "pages": pages}
